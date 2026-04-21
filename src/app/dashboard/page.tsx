@@ -130,6 +130,16 @@ export default async function DashboardPage() {
           </p>
         </section>
 
+        {/* AI Import Banner */}
+        <section className="mb-6 card-surface rounded-[1.75rem] p-5 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-[var(--accent)]">✦ AI Import</p>
+            <h2 className="mt-1 text-xl font-semibold tracking-tight">
+              Turn screenshots into clean money records instantly.
+            </h2>
+          </div>
+        </section>
+
         {/* Quick Actions */}
         <section className="mb-8 flex flex-wrap gap-3">
           <AddTransactionDialog

@@ -1,8 +1,9 @@
 export const aiPrompts = {
-  receiptParser: `Extract transaction fields from this receipt: date, amount, merchant, currency, category, payment method, card ending, notes.`,
-  bankScreenshotParser: `Extract all transactions from this bank screenshot. Normalize date to ISO, include amount sign and merchant.`,
-  noteToTransactionParser: `Convert freeform money notes into structured transaction records with date, amount, category, merchant, notes, and related person.`,
-  chatDebtParser: `Extract debt entries from this message thread including counterparty, amount, debt type, due date, and status.`,
+  receiptParser: `Extract transaction fields from this receipt: date, amount, merchant, currency, category, payment method, card ending, notes. Set confidence (0–1) based on how clearly you can read the data.`,
+  bankScreenshotParser: `Extract all transactions from this bank screenshot. Normalize date to ISO, include amount sign and merchant. Set confidence (0–1) based on visibility and completeness.`,
+  noteToTransactionParser: `Convert freeform money notes into structured transaction records with date, amount, category, merchant, notes, and related person. Set confidence (0–1) based on how clear and complete the input is.`,
+  chatDebtParser: `Extract debt entries from this message thread including counterparty, amount, debt type, due date, and status. Set confidence (0–1) based on how unambiguous the debt details are.`,
+  imageParser: `You are a financial data extraction engine. Analyze this image — it may be a receipt, bank app screenshot, handwritten expense note, payment app screenshot, or invoice. Extract: amount (numeric, required), date (ISO format), merchant or person name, type (TRANSACTION or DEBT), category (e.g. Food, Transport, Shopping, Utilities, Entertainment, Healthcare, Travel), paymentMethod (e.g. Cash, Card, Zelle, Venmo, Bank Transfer), currency (3-letter ISO code, default USD), and any relevant notes. If the image shows a debt scenario (money owed, lending, borrowing, IOU), set type to DEBT and include counterpartyName and debtType (LENT, BORROWED, CUSTOMER_UNPAID, ADVANCE_PAYMENT, or REIMBURSEMENT_PENDING). Set confidence (0–1) based on image clarity and data completeness — extract every readable detail even from partial text.`,
   expenseCategorizer: `Classify transaction records into meaningful categories for personal and small business finance tracking.`,
   duplicateDetector: `Detect potential duplicates by amount, merchant similarity, date proximity, and attachment similarity. Return confidence score.`,
   monthlySummaryWriter: `Generate a concise and friendly monthly finance summary with key spend categories, debt changes, and actionable reminders.`

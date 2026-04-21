@@ -12,7 +12,8 @@ export const parsedImportSchema = z.object({
   transactionDate: z.string().optional(),
   type: z.enum(["TRANSACTION", "DEBT"]).default("TRANSACTION"),
   debtType: z.enum(["LENT", "BORROWED", "CUSTOMER_UNPAID", "ADVANCE_PAYMENT", "REIMBURSEMENT_PENDING"]).optional(),
-  dueDate: z.string().optional()
+  dueDate: z.string().optional(),
+  confidence: z.number().min(0).max(1).optional()
 });
 
 export type ParsedImport = z.infer<typeof parsedImportSchema>;
@@ -35,7 +36,8 @@ export function heuristicParseImport(input: string): ParsedImport {
     notes: input,
     counterpartyName: type === "DEBT" ? extractCounterparty(input) : undefined,
     type,
-    dueDate: extractRelativeDueDate(input)
+    dueDate: extractRelativeDueDate(input),
+    confidence: 0.35
   };
 
   return parsedImportSchema.parse(draft);
