@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const parsedImportSchema = z.object({
+export const parsedImportSchema = z.object({
   title: z.string(),
   amount: z.number().positive(),
   merchant: z.string().optional(),
@@ -8,7 +8,10 @@ const parsedImportSchema = z.object({
   paymentMethod: z.string().optional(),
   notes: z.string().optional(),
   counterpartyName: z.string().optional(),
+  currency: z.string().length(3).optional(),
+  transactionDate: z.string().optional(),
   type: z.enum(["TRANSACTION", "DEBT"]).default("TRANSACTION"),
+  debtType: z.enum(["LENT", "BORROWED", "CUSTOMER_UNPAID", "ADVANCE_PAYMENT", "REIMBURSEMENT_PENDING"]).optional(),
   dueDate: z.string().optional()
 });
 
