@@ -11,10 +11,21 @@ export async function getRequestUser() {
     return null;
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await prisma.user.upsert({
     where: { email },
-    include: {
-      memberships: true
+    update: {
+      fullName: session.user?.name ?? undefined,
+      avatarUrl: session.user?.image ?? undefined,
+      name: session.user?.name ?? undefined,
+      image: session.user?.image ?? undefined
+    },
+    create: {
+      email,
+      authUserId: email,
+      fullName: session.user?.name ?? undefined,
+      avatarUrl: session.user?.image ?? undefined,
+      name: session.user?.name ?? undefined,
+      image: session.user?.image ?? undefined
     }
   });
 
