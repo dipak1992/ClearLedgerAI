@@ -1,7 +1,17 @@
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+
 import { AuthActions } from "@/components/auth/auth-actions";
 import { env } from "@/lib/env";
+import { authOptions } from "@/lib/server/auth-options";
 
-export default function SignInPage() {
+export default async function SignInPage() {
+  const session = await getServerSession(authOptions);
+
+  if (session?.user?.email) {
+    redirect("/dashboard");
+  }
+
   const emailEnabled = Boolean(env.EMAIL_SERVER && env.EMAIL_FROM);
 
   return (
