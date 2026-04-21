@@ -7,3 +7,5 @@ export { SkeletonRow, SkeletonCard } from "./skeleton";
 export { Sheet } from "./sheet";
 export { MobileBottomNav, DEFAULT_MOBILE_NAV } from "./mobile-bottom-nav";
 export { Sidebar } from "./sidebar";
+export { AddRecordSheet } from "./add-record-sheet";
+export { GlobalSearchPalette } from "./global-search";

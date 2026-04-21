@@ -2,10 +2,11 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 
 import { Sidebar } from "./sidebar";
 import { MobileBottomNav } from "./mobile-bottom-nav";
+import { GlobalSearchPalette } from "./global-search";
 import { cn } from "@/lib/utils";
 
 export interface AppShellProps {
@@ -28,6 +29,20 @@ export interface AppShellProps {
  * insets and uses min 44px tap targets.
  */
 export function AppShell({ children, topBarRight, topBarTitle, onAddRecord }: AppShellProps) {
+  const [searchOpen, setSearchOpen] = React.useState(false);
+
+  // ⌘K / Ctrl+K global shortcut
+  React.useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   return (
     <div className="min-h-screen md:flex">
       <Sidebar />
@@ -35,7 +50,20 @@ export function AppShell({ children, topBarRight, topBarTitle, onAddRecord }: Ap
         {(topBarRight || topBarTitle) && (
           <header className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-white/5 bg-[#0b1020]/80 px-5 py-4 backdrop-blur md:px-8">
             <div className="min-w-0 flex-1">{topBarTitle}</div>
-            {topBarRight ? <div className="flex-none">{topBarRight}</div> : null}
+            <div className="flex items-center gap-2">
+              {/* Search trigger */}
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="flex items-center gap-2 rounded-xl border border-white/10 px-3 py-1.5 text-xs text-white/40 hover:text-white/70 transition"
+                aria-label="Open search (⌘K)"
+              >
+                <Search className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Search</span>
+                <kbd className="hidden rounded bg-white/8 px-1.5 py-0.5 font-mono text-[10px] sm:block">⌘K</kbd>
+              </button>
+              {topBarRight ? <div className="flex-none">{topBarRight}</div> : null}
+            </div>
           </header>
         )}
         <main
@@ -53,6 +81,8 @@ export function AppShell({ children, topBarRight, topBarTitle, onAddRecord }: Ap
       <FloatingAddButton onAddRecord={onAddRecord} />
 
       <MobileBottomNav onAdd={onAddRecord} />
+
+      <GlobalSearchPalette open={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

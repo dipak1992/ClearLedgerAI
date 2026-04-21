@@ -5,6 +5,21 @@ import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 
+interface WorkspaceTemplate {
+  name: string;
+  description: string;
+  emoji: string;
+}
+
+const WORKSPACE_TEMPLATES: WorkspaceTemplate[] = [
+  { emoji: "🏠", name: "Personal", description: "Everyday personal expenses and income" },
+  { emoji: "💼", name: "Business", description: "Business revenue, invoices, and operating costs" },
+  { emoji: "🏡", name: "Roommates", description: "Shared rent, bills, and household expenses" },
+  { emoji: "👨‍👩‍👧", name: "Family", description: "Family budget, subscriptions, and shared costs" },
+  { emoji: "🚀", name: "Side Hustle", description: "Freelance income, project costs, and expenses" },
+  { emoji: "✈️", name: "Vacation", description: "Trip planning, bookings, and travel spend" }
+];
+
 export function CreateWorkspaceDialog() {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
@@ -18,6 +33,11 @@ export function CreateWorkspaceDialog() {
     setName("");
     setDescription("");
     setError(null);
+  }
+
+  function applyTemplate(t: WorkspaceTemplate) {
+    setName(t.name);
+    setDescription(t.description);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -61,7 +81,29 @@ export function CreateWorkspaceDialog() {
               Organize money by life area — personal, business, roommates, etc.
             </p>
 
-            <form className="mt-6 flex flex-col gap-4" onSubmit={handleSubmit}>
+            {/* Templates */}
+            <div className="mt-5">
+              <p className="mb-2 text-xs font-medium text-white/40 uppercase tracking-wider">Start from a template</p>
+              <div className="grid grid-cols-3 gap-2">
+                {WORKSPACE_TEMPLATES.map((t) => (
+                  <button
+                    key={t.name}
+                    type="button"
+                    onClick={() => applyTemplate(t)}
+                    className={`flex flex-col items-center gap-1.5 rounded-xl border p-3 text-center transition hover:bg-white/8 ${
+                      name === t.name
+                        ? "border-[var(--brand-500)] bg-[var(--brand-600)]/10"
+                        : "border-white/8"
+                    }`}
+                  >
+                    <span className="text-xl">{t.emoji}</span>
+                    <span className="text-xs font-medium text-white/80">{t.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form className="mt-5 flex flex-col gap-4" onSubmit={handleSubmit}>
               <div>
                 <label className="mb-1.5 block text-sm text-white/60">Name *</label>
                 <input

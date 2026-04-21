@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FolderKanban, LineChart, Settings as SettingsIcon, Wallet } from "lucide-react";
+import { Home, FolderKanban, LineChart, Settings as SettingsIcon, Wallet, Receipt } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,7 @@ interface NavLink {
 
 const SIDEBAR_LINKS: NavLink[] = [
   { href: "/dashboard", label: "Home", icon: <Home className="h-4 w-4" /> },
+  { href: "/records", label: "Records", icon: <Receipt className="h-4 w-4" />, match: (p) => p.startsWith("/records") },
   { href: "/workspaces", label: "Workspaces", icon: <FolderKanban className="h-4 w-4" />, match: (p) => p.startsWith("/workspaces") },
   { href: "/debts", label: "Debts", icon: <Wallet className="h-4 w-4" />, match: (p) => p.startsWith("/debts") },
   { href: "/insights", label: "Insights", icon: <LineChart className="h-4 w-4" />, match: (p) => p.startsWith("/insights") || p.startsWith("/reports") },
