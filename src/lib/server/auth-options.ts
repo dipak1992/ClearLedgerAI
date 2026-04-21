@@ -28,7 +28,7 @@ if (env.EMAIL_SERVER && env.EMAIL_FROM) {
 
 export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
-  secret: env.AUTH_SECRET,
+  secret: env.AUTH_SECRET ?? process.env.NEXTAUTH_SECRET,
   session: {
     strategy: "jwt"
   },
