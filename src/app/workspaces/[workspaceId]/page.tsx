@@ -167,7 +167,7 @@ export default async function WorkspaceLedgerPage({
                       key={tx.id}
                     >
                       <td className="px-6 py-4">
-                        <Link href={`/transactions/${tx.moneyRecordId ?? tx.id}`} className="hover:text-[var(--brand-500)] transition-colors">
+                        <Link href={`/transactions/${tx.id}`} className="hover:text-[var(--brand-500)] transition-colors">
                           <p className="font-medium text-white">{tx.title}</p>
                           {tx.merchant && <p className="text-xs text-white/40">{tx.merchant}</p>}
                         </Link>
