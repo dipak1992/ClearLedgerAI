@@ -16,6 +16,23 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "workspaceId query param is required" }, { status: 400 });
   }
 
+  const user = await getRequestUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
+  const membership = await prisma.workspaceMember.findFirst({
+    where: {
+      workspaceId,
+      userId: user.id
+    }
+  });
+
+  if (!membership) {
+    return NextResponse.json({ error: "You do not have access to this workspace" }, { status: 403 });
+  }
+
   const debts = await prisma.debt.findMany({
     where: { workspaceId },
     include: {
@@ -54,6 +71,11 @@ export async function POST(request: Request) {
   }
 
   const user = await getRequestUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const payload = parsed.data;
 
   const membership = await prisma.workspaceMember.findFirst({

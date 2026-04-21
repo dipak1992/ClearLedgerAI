@@ -1,8 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 
+import { env } from "@/lib/env";
+
 const connectionString =
-  process.env.DATABASE_URL ?? "postgresql://postgres:postgres@localhost:5432/clearledger_ai?schema=public";
+  env.DATABASE_URL ??
+  env.NEON_DATABASE_URL ??
+  "postgresql://postgres:postgres@localhost:5432/clearledger_ai?schema=public";
 
 const adapter = new PrismaPg({ connectionString });
 

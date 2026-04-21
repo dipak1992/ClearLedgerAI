@@ -1,7 +1,7 @@
 - [x] Verify that the copilot-instructions.md file in the .github directory is created.
 
 - [x] Clarify Project Requirements
-  ClearLedger AI is a production-grade Next.js SaaS app using TypeScript, Tailwind, Prisma, Supabase-ready auth/storage, Stripe-ready billing, PostHog-ready analytics, Sentry-ready monitoring, and AI import flows.
+  ClearLedger AI is a production-grade Next.js SaaS app using TypeScript, Tailwind, Prisma, Neon-ready PostgreSQL, Stripe-ready billing, PostHog-ready analytics, Sentry-ready monitoring, and AI import flows.
 
 - [x] Scaffold the Project
   Manual scaffold used because create-next-app rejected the uppercase workspace folder name. Base Next.js app files, starter routes, Prisma schema, env template, and docs were created directly in the current directory.

@@ -6,8 +6,8 @@ ClearLedger AI is a modern SaaS webapp for organizing transactions, shared expen
 
 - Next.js 16 with App Router and TypeScript
 - Tailwind CSS 4
-- Prisma with PostgreSQL
-- Supabase-ready auth and storage env surface
+- Neon PostgreSQL + Prisma
+- Auth-provider-ready surface (Auth.js or Clerk)
 - Stripe-ready billing env surface
 - PostHog and Sentry-ready env surface
 
@@ -44,13 +44,13 @@ ClearLedger AI is a modern SaaS webapp for organizing transactions, shared expen
 - Shared UI utility layer
 - Prisma schema for users, workspaces, transactions, debts, attachments, comments, subscriptions, audit logs, and notifications
 - API routes for workspaces, transactions, debts, debt payments, and AI import parsing
-- Server architecture layer with Prisma client, request user bootstrap, typed validators, AI prompt templates, and integration-ready Supabase/Stripe/PostHog modules
-- Environment template for Supabase, AI providers, Stripe, PostHog, Sentry, and storage
+- Server architecture layer with Prisma client, request user bootstrap, typed validators, AI prompt templates, and integration-ready Neon/Stripe/PostHog modules
+- Environment template for Neon, AI providers, Stripe, PostHog, Sentry, and storage
 
 ## Next Build Steps
 
-- Supabase auth wiring
+- Auth.js or Clerk wiring
 - Workspace CRUD and invites
 - AI provider-backed parsing (OpenAI/Claude/Gemini) replacing heuristic fallback
-- File upload + OCR ingestion pipeline (Supabase Storage/S3)
+- File upload + OCR ingestion pipeline (S3/R2)
 - Reports, exports, and billing controls

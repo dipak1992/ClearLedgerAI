@@ -19,6 +19,10 @@ function toSlug(input: string) {
 export async function GET() {
   const user = await getRequestUser();
 
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const memberships = await prisma.workspaceMember.findMany({
     where: { userId: user.id },
     include: {
@@ -49,6 +53,11 @@ export async function POST(request: Request) {
   }
 
   const user = await getRequestUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const baseSlug = toSlug(parsed.data.name);
 
   const workspace = await prisma.workspace.create({

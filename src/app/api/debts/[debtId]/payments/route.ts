@@ -17,6 +17,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ deb
   }
 
   const user = await getRequestUser();
+
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
+  }
+
   const { debtId } = await params;
 
   const debt = await prisma.debt.findUnique({ where: { id: debtId } });
