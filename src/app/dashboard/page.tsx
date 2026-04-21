@@ -1,13 +1,16 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, Clock3, Wallet, FolderOpen } from "lucide-react";
+import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp } from "lucide-react";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { formatCurrency } from "@/lib/utils";
 import { CreateWorkspaceDialog } from "@/components/dashboard/create-workspace-dialog";
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
+import { AddDebtDialog } from "@/components/dashboard/add-debt-dialog";
+import { AiImportWidget } from "@/components/dashboard/ai-import-widget";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { AppNav } from "@/components/layout/app-nav";
 
 type TransactionType = "EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT";
 
@@ -24,37 +27,54 @@ function typeLabel(type: TransactionType) {
   return type.charAt(0) + type.slice(1).toLowerCase();
 }
 
+function getGreeting() {
+  const h = new Date().getUTCHours();
+  return h < 12 ? "Good morning" : h < 18 ? "Good afternoon" : "Good evening";
+}
+
 export default async function DashboardPage() {
   const user = await getRequestUser();
   if (!user) redirect("/sign-in");
 
-  // fetch all workspace memberships for this user
   const memberships = await prisma.workspaceMember.findMany({
     where: { userId: user.id },
     include: {
       workspace: {
-        include: {
-          _count: { select: { transactions: true } }
-        }
+        include: { _count: { select: { transactions: true } } }
       }
     },
     orderBy: { workspace: { createdAt: "asc" } }
   });
 
   const workspaces = memberships.map((m) => m.workspace);
-
-  // fetch recent transactions across all user workspaces
   const workspaceIds = workspaces.map((w) => w.id);
-  const recentTransactions = workspaceIds.length
-    ? await prisma.transaction.findMany({
-        where: { workspaceId: { in: workspaceIds } },
-        orderBy: { transactionDate: "desc" },
-        take: 20,
-        include: { workspace: { select: { name: true } } }
-      })
-    : [];
 
-  // stats
+  const [recentTransactions, openDebts] = await Promise.all([
+    workspaceIds.length
+      ? prisma.transaction.findMany({
+          where: { workspaceId: { in: workspaceIds } },
+          orderBy: { transactionDate: "desc" },
+          take: 10,
+          include: { workspace: { select: { name: true } } }
+        })
+      : Promise.resolve([]),
+    workspaceIds.length
+      ? prisma.debt.findMany({
+          where: {
+            workspaceId: { in: workspaceIds },
+            status: { in: ["OPEN", "PARTIAL", "OVERDUE"] }
+          },
+          select: {
+            id: true,
+            type: true,
+            status: true,
+            balanceRemaining: true,
+            dueDate: true,
+          }
+        })
+      : Promise.resolve([]),
+  ]);
+
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
@@ -66,40 +86,94 @@ export default async function DashboardPage() {
     .filter((t) => t.transactionType === "INCOME" && t.transactionDate >= monthStart)
     .reduce((acc, t) => acc + Number(t.amount), 0);
 
+  const netFlow = totalIncomeThisMonth - totalSpentThisMonth;
+
+  const owedToYou = openDebts
+    .filter((d) => ["LENT", "CUSTOMER_UNPAID", "REIMBURSEMENT_PENDING"].includes(d.type))
+    .reduce((sum, d) => sum + Number(d.balanceRemaining), 0);
+
+  const youOwe = openDebts
+    .filter((d) => ["BORROWED", "ADVANCE_PAYMENT"].includes(d.type))
+    .reduce((sum, d) => sum + Number(d.balanceRemaining), 0);
+
+  const overdueCount = openDebts.filter((d) => d.status === "OVERDUE").length;
+
   const workspaceList = workspaces.map((ws) => ({ id: ws.id, name: ws.name }));
   const defaultWorkspaceId = workspaces[0]?.id;
+  const firstName = user.name?.split(" ")[0] ?? "there";
 
   return (
     <main className="min-h-screen px-5 py-8 sm:px-8 lg:px-10">
       <div className="mx-auto max-w-7xl">
 
-        {/* Header */}
-        <header className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-sm uppercase tracking-[0.2em] text-white/40">Dashboard</p>
-            <h1 className="mt-1 text-3xl font-semibold tracking-tight">
-              Welcome back, {user.name?.split(" ")[0] ?? "there"}
-            </h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <AddTransactionDialog
-              defaultWorkspaceId={defaultWorkspaceId}
-              workspaces={workspaceList}
-            />
-            <CreateWorkspaceDialog />
-            <SignOutButton />
-          </div>
+        {/* Top bar */}
+        <header className="mb-8 flex items-center justify-between gap-4">
+          <Link
+            className="text-xl font-bold tracking-tight text-[var(--brand-500)]"
+            href="/dashboard"
+          >
+            ClearLedger
+          </Link>
+          <AppNav />
+          <SignOutButton />
         </header>
 
+        {/* Greeting */}
+        <section className="mb-8">
+          <h1 className="text-3xl font-semibold tracking-tight">
+            {getGreeting()}, {firstName}
+          </h1>
+          <p className="mt-1.5 text-[var(--muted)]">
+            {netFlow >= 0
+              ? `You're ${formatCurrency(netFlow)} ahead this month.`
+              : `You're ${formatCurrency(Math.abs(netFlow))} over budget this month.`}
+          </p>
+        </section>
+
+        {/* Quick Actions */}
+        <section className="mb-8 flex flex-wrap gap-3">
+          <AddTransactionDialog
+            defaultType="EXPENSE"
+            defaultWorkspaceId={defaultWorkspaceId}
+            triggerLabel="+ Expense"
+            workspaces={workspaceList}
+          />
+          <AddTransactionDialog
+            defaultType="INCOME"
+            defaultWorkspaceId={defaultWorkspaceId}
+            triggerLabel="+ Income"
+            workspaces={workspaceList}
+          />
+          <AddTransactionDialog
+            defaultType="TRANSFER"
+            defaultWorkspaceId={defaultWorkspaceId}
+            triggerLabel="+ Transfer"
+            workspaces={workspaceList}
+          />
+          <AddDebtDialog
+            defaultWorkspaceId={defaultWorkspaceId}
+            workspaces={workspaceList}
+          />
+          <AiImportWidget
+            defaultWorkspaceId={defaultWorkspaceId}
+            workspaces={workspaceList}
+          />
+          <CreateWorkspaceDialog />
+        </section>
+
         {/* Stats */}
-        <section className="grid gap-4 sm:grid-cols-3">
+        <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <article className="card-surface rounded-[1.75rem] p-6">
             <div className="flex items-center justify-between">
               <p className="text-sm text-white/50">Spent this month</p>
-              <Wallet className="h-5 w-5 text-[var(--brand-500)]" />
+              <Wallet className="h-5 w-5 text-red-400" />
             </div>
-            <p className="mt-4 text-4xl font-semibold text-white">{formatCurrency(totalSpentThisMonth)}</p>
-            <p className="mt-2 text-sm text-[var(--muted)]">Expenses in {now.toLocaleString("default", { month: "long" })}</p>
+            <p className="mt-4 text-3xl font-semibold text-white">
+              {formatCurrency(totalSpentThisMonth)}
+            </p>
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              Expenses in {now.toLocaleString("default", { month: "long" })}
+            </p>
           </article>
 
           <article className="card-surface rounded-[1.75rem] p-6">
@@ -107,54 +181,79 @@ export default async function DashboardPage() {
               <p className="text-sm text-white/50">Income this month</p>
               <ArrowUpRight className="h-5 w-5 text-emerald-400" />
             </div>
-            <p className="mt-4 text-4xl font-semibold text-emerald-400">{formatCurrency(totalIncomeThisMonth)}</p>
-            <p className="mt-2 text-sm text-[var(--muted)]">All income transactions</p>
+            <p className="mt-4 text-3xl font-semibold text-emerald-400">
+              {formatCurrency(totalIncomeThisMonth)}
+            </p>
+            <p className="mt-2 text-xs text-[var(--muted)]">All income transactions</p>
           </article>
 
           <article className="card-surface rounded-[1.75rem] p-6">
             <div className="flex items-center justify-between">
-              <p className="text-sm text-white/50">Total transactions</p>
+              <p className="text-sm text-white/50">Net flow</p>
+              {netFlow >= 0
+                ? <TrendingUp className="h-5 w-5 text-[var(--brand-500)]" />
+                : <TrendingDown className="h-5 w-5 text-red-400" />
+              }
+            </div>
+            <p className={`mt-4 text-3xl font-semibold ${netFlow >= 0 ? "text-[var(--brand-500)]" : "text-red-400"}`}>
+              {netFlow >= 0 ? "+" : "-"}{formatCurrency(Math.abs(netFlow))}
+            </p>
+            <p className="mt-2 text-xs text-[var(--muted)]">Income minus expenses</p>
+          </article>
+
+          <article className="card-surface rounded-[1.75rem] p-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-white/50">Open debts</p>
               <Clock3 className="h-5 w-5 text-[var(--accent)]" />
             </div>
-            <p className="mt-4 text-4xl font-semibold text-white">
-              {recentTransactions.length}
+            <p className="mt-4 text-3xl font-semibold text-white">
+              {openDebts.length}
             </p>
-            <p className="mt-2 text-sm text-[var(--muted)]">Across {workspaces.length} workspace{workspaces.length !== 1 ? "s" : ""}</p>
+            <p className="mt-2 text-xs text-[var(--muted)]">
+              {overdueCount > 0 ? (
+                <span className="text-red-400">{overdueCount} overdue</span>
+              ) : (
+                "No overdue items"
+              )}
+            </p>
           </article>
         </section>
 
-        {/* Workspaces */}
-        <section className="mt-8">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold">Your Workspaces</h2>
-            <CreateWorkspaceDialog />
-          </div>
-
-          {workspaces.length === 0 ? (
-            <div className="card-surface flex flex-col items-center gap-4 rounded-[1.75rem] py-16 text-center">
-              <FolderOpen className="h-10 w-10 text-white/20" />
-              <p className="text-white/60">No workspaces yet. Create one to start tracking money.</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {workspaces.map((ws) => (
+        {/* Debt Snapshot */}
+        {(owedToYou > 0 || youOwe > 0) && (
+          <section className="mt-6 grid gap-4 sm:grid-cols-2">
+            {owedToYou > 0 && (
+              <article className="card-surface rounded-[1.75rem] p-6">
+                <p className="text-sm text-white/50">Owed to you</p>
+                <p className="mt-3 text-3xl font-semibold text-emerald-400">
+                  {formatCurrency(owedToYou)}
+                </p>
+                <p className="mt-2 text-xs text-[var(--muted)]">Lent + customer + reimbursements</p>
                 <Link
-                  className="card-surface group flex flex-col gap-2 rounded-[1.75rem] p-6 transition hover:border-[var(--brand-500)]/40"
-                  href={`/workspaces/${ws.id}`}
-                  key={ws.id}
+                  className="mt-4 inline-block text-xs font-medium text-[var(--brand-500)] hover:underline"
+                  href="/debts"
                 >
-                  <p className="font-semibold group-hover:text-[var(--brand-500)] transition-colors">{ws.name}</p>
-                  {ws.description && (
-                    <p className="text-sm text-[var(--muted)] line-clamp-2">{ws.description}</p>
-                  )}
-                  <p className="mt-auto pt-3 text-xs text-white/40">
-                    {ws._count.transactions} transaction{ws._count.transactions !== 1 ? "s" : ""}
-                  </p>
+                  View all debts →
                 </Link>
-              ))}
-            </div>
-          )}
-        </section>
+              </article>
+            )}
+            {youOwe > 0 && (
+              <article className="card-surface rounded-[1.75rem] p-6">
+                <p className="text-sm text-white/50">You owe</p>
+                <p className="mt-3 text-3xl font-semibold text-red-400">
+                  {formatCurrency(youOwe)}
+                </p>
+                <p className="mt-2 text-xs text-[var(--muted)]">Borrowed + advances pending</p>
+                <Link
+                  className="mt-4 inline-block text-xs font-medium text-[var(--brand-500)] hover:underline"
+                  href="/debts"
+                >
+                  View all debts →
+                </Link>
+              </article>
+            )}
+          </section>
+        )}
 
         {/* Recent Transactions */}
         <section className="mt-8">
@@ -171,7 +270,7 @@ export default async function DashboardPage() {
               <p className="text-white/60">
                 {workspaces.length === 0
                   ? "Create a workspace first, then add transactions."
-                  : "No transactions yet. Click \"+ Add Transaction\" to get started."}
+                  : "No transactions yet. Use the quick actions above to get started."}
               </p>
             </div>
           ) : (
@@ -196,7 +295,9 @@ export default async function DashboardPage() {
                         <p className="font-medium text-white">{tx.title}</p>
                         {tx.merchant && <p className="text-xs text-white/40">{tx.merchant}</p>}
                       </td>
-                      <td className="hidden px-4 py-4 text-white/60 sm:table-cell">{tx.workspace.name}</td>
+                      <td className="hidden px-4 py-4 text-white/60 sm:table-cell">
+                        {tx.workspace.name}
+                      </td>
                       <td className="hidden px-4 py-4 text-white/60 md:table-cell">
                         {new Date(tx.transactionDate).toLocaleDateString("en-US", {
                           month: "short", day: "numeric", year: "numeric"
@@ -218,21 +319,39 @@ export default async function DashboardPage() {
           )}
         </section>
 
-        {/* Quick nav */}
-        <section className="mt-8 grid gap-3 sm:grid-cols-3">
-          {[
-            { href: "/debts", label: "Debt Tracker" },
-            { href: "/reports", label: "Reports" },
-            { href: "/settings", label: "Settings" }
-          ].map((item) => (
-            <Link
-              className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3.5 text-sm font-medium text-white/70 transition hover:bg-white/10 hover:text-white"
-              href={item.href}
-              key={item.href}
-            >
-              {item.label}
-            </Link>
-          ))}
+        {/* Workspaces */}
+        <section className="mt-8">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Your Workspaces</h2>
+            <CreateWorkspaceDialog />
+          </div>
+
+          {workspaces.length === 0 ? (
+            <div className="card-surface flex flex-col items-center gap-4 rounded-[1.75rem] py-16 text-center">
+              <FolderOpen className="h-10 w-10 text-white/20" />
+              <p className="text-white/60">No workspaces yet. Create one to start tracking money.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {workspaces.map((ws) => (
+                <Link
+                  className="card-surface group flex flex-col gap-2 rounded-[1.75rem] p-6 transition hover:border-[var(--brand-500)]/40"
+                  href={`/workspaces/${ws.id}`}
+                  key={ws.id}
+                >
+                  <p className="font-semibold transition-colors group-hover:text-[var(--brand-500)]">
+                    {ws.name}
+                  </p>
+                  {ws.description && (
+                    <p className="line-clamp-2 text-sm text-[var(--muted)]">{ws.description}</p>
+                  )}
+                  <p className="mt-auto pt-3 text-xs text-white/40">
+                    {ws._count.transactions} transaction{ws._count.transactions !== 1 ? "s" : ""}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          )}
         </section>
 
       </div>

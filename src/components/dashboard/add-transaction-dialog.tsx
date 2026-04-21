@@ -13,6 +13,8 @@ interface Workspace {
 interface AddTransactionDialogProps {
   workspaces: Workspace[];
   defaultWorkspaceId?: string;
+  defaultType?: "EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT";
+  triggerLabel?: string;
 }
 
 const TRANSACTION_TYPES = [
@@ -26,7 +28,7 @@ function todayIso() {
   return new Date().toISOString().split("T")[0];
 }
 
-export function AddTransactionDialog({ workspaces, defaultWorkspaceId }: AddTransactionDialogProps) {
+export function AddTransactionDialog({ workspaces, defaultWorkspaceId, defaultType, triggerLabel }: AddTransactionDialogProps) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +37,7 @@ export function AddTransactionDialog({ workspaces, defaultWorkspaceId }: AddTran
   const [workspaceId, setWorkspaceId] = useState(defaultWorkspaceId ?? workspaces[0]?.id ?? "");
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
-  const [transactionType, setTransactionType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT">("EXPENSE");
+  const [transactionType, setTransactionType] = useState<"EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT">(defaultType ?? "EXPENSE");
   const [transactionDate, setTransactionDate] = useState(todayIso());
   const [merchant, setMerchant] = useState("");
   const [notes, setNotes] = useState("");
@@ -45,7 +47,7 @@ export function AddTransactionDialog({ workspaces, defaultWorkspaceId }: AddTran
     setError(null);
     setTitle("");
     setAmount("");
-    setTransactionType("EXPENSE");
+    setTransactionType(defaultType ?? "EXPENSE");
     setTransactionDate(todayIso());
     setMerchant("");
     setNotes("");
@@ -100,7 +102,7 @@ export function AddTransactionDialog({ workspaces, defaultWorkspaceId }: AddTran
 
   return (
     <>
-      <Button onClick={() => setOpen(true)}>+ Add Transaction</Button>
+      <Button onClick={() => setOpen(true)}>{triggerLabel ?? "+ Add Transaction"}</Button>
 
       {open && (
         <div

@@ -1,38 +1,186 @@
-import { CalendarClock, HandCoins, ReceiptText } from "lucide-react";
+import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft } from "lucide-react";
 
+import { getRequestUser } from "@/lib/server/auth";
+import { prisma } from "@/lib/server/prisma";
 import { formatCurrency } from "@/lib/utils";
+import { AppNav } from "@/components/layout/app-nav";
+import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
+
+type TransactionType = "EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT";
+
+function typeBadgeClass(type: TransactionType) {
+  switch (type) {
+    case "INCOME":        return "bg-emerald-500/15 text-emerald-400";
+    case "TRANSFER":      return "bg-blue-500/15 text-blue-400";
+    case "REIMBURSEMENT": return "bg-yellow-500/15 text-yellow-400";
+    default:              return "bg-red-500/15 text-red-400";
+  }
+}
+
+function typeLabel(type: TransactionType) {
+  return type.charAt(0) + type.slice(1).toLowerCase();
+}
 
 export default async function WorkspaceLedgerPage({ params }: { params: Promise<{ workspaceId: string }> }) {
   const { workspaceId } = await params;
+  const user = await getRequestUser();
+  if (!user) redirect("/sign-in");
+
+  // Verify membership
+  const membership = await prisma.workspaceMember.findUnique({
+    where: { workspaceId_userId: { workspaceId, userId: user.id } },
+    include: { workspace: true },
+  });
+  if (!membership) notFound();
+
+  const workspace = membership.workspace;
+
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const transactions = await prisma.transaction.findMany({
+    where: { workspaceId },
+    orderBy: { transactionDate: "desc" },
+    take: 50,
+  });
+
+  const memberCount = await prisma.workspaceMember.count({ where: { workspaceId } });
+
+  const monthlySpent = transactions
+    .filter((t) => t.transactionType === "EXPENSE" && t.transactionDate >= monthStart)
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const monthlyIncome = transactions
+    .filter((t) => t.transactionType === "INCOME" && t.transactionDate >= monthStart)
+    .reduce((sum, t) => sum + Number(t.amount), 0);
+
+  const workspaceList = [{ id: workspace.id, name: workspace.name }];
 
   return (
     <main className="min-h-screen px-5 py-8 sm:px-8 lg:px-10">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div>
-          <p className="text-sm uppercase tracking-[0.2em] text-white/40">Workspace Ledger</p>
-          <h1 className="mt-2 text-4xl font-semibold">{workspaceId}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-[var(--muted)]">
-            This ledger tab is prepared for transaction tables, filters, receipt previews, and split calculations.
-          </p>
+      <div className="mx-auto max-w-7xl">
+
+        {/* Top bar */}
+        <header className="mb-8 flex items-center justify-between gap-4">
+          <Link
+            className="text-xl font-bold tracking-tight text-[var(--brand-500)]"
+            href="/dashboard"
+          >
+            ClearLedger
+          </Link>
+          <AppNav />
+          <SignOutButton />
+        </header>
+
+        {/* Back + title */}
+        <div className="mb-8">
+          <Link
+            className="inline-flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors"
+            href="/dashboard"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back to Dashboard
+          </Link>
+          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{workspace.name}</h1>
+          {workspace.description && (
+            <p className="mt-1.5 text-[var(--muted)]">{workspace.description}</p>
+          )}
         </div>
 
-        <section className="grid gap-4 md:grid-cols-3">
-          <article className="card-surface rounded-3xl p-5">
-            <ReceiptText className="h-5 w-5 text-[var(--brand-500)]" />
-            <p className="mt-4 text-sm text-white/50">Monthly expenses</p>
-            <p className="mt-2 text-3xl font-semibold">{formatCurrency(2230)}</p>
+        {/* Stats */}
+        <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <article className="card-surface rounded-[1.75rem] p-6">
+            <p className="text-sm text-white/50">Monthly spent</p>
+            <p className="mt-3 text-3xl font-semibold text-white">
+              {formatCurrency(monthlySpent)}
+            </p>
+            <p className="mt-1.5 text-xs text-[var(--muted)]">
+              {now.toLocaleString("default", { month: "long" })} expenses
+            </p>
           </article>
-          <article className="card-surface rounded-3xl p-5">
-            <HandCoins className="h-5 w-5 text-[var(--brand-500)]" />
-            <p className="mt-4 text-sm text-white/50">Split pending</p>
-            <p className="mt-2 text-3xl font-semibold">{formatCurrency(410)}</p>
+
+          <article className="card-surface rounded-[1.75rem] p-6">
+            <p className="text-sm text-white/50">Monthly income</p>
+            <p className="mt-3 text-3xl font-semibold text-emerald-400">
+              {formatCurrency(monthlyIncome)}
+            </p>
+            <p className="mt-1.5 text-xs text-[var(--muted)]">
+              {now.toLocaleString("default", { month: "long" })} income
+            </p>
           </article>
-          <article className="card-surface rounded-3xl p-5">
-            <CalendarClock className="h-5 w-5 text-[var(--brand-500)]" />
-            <p className="mt-4 text-sm text-white/50">Recurring reminders</p>
-            <p className="mt-2 text-3xl font-semibold">4</p>
+
+          <article className="card-surface rounded-[1.75rem] p-6">
+            <p className="text-sm text-white/50">Total transactions</p>
+            <p className="mt-3 text-3xl font-semibold text-white">{transactions.length}</p>
+            <p className="mt-1.5 text-xs text-[var(--muted)]">Last 50 shown</p>
+          </article>
+
+          <article className="card-surface rounded-[1.75rem] p-6">
+            <p className="text-sm text-white/50">Members</p>
+            <p className="mt-3 text-3xl font-semibold text-white">{memberCount}</p>
+            <p className="mt-1.5 text-xs text-[var(--muted)]">Workspace collaborators</p>
           </article>
         </section>
+
+        {/* Transactions */}
+        <section>
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold">Transactions</h2>
+            <AddTransactionDialog
+              defaultWorkspaceId={workspaceId}
+              workspaces={workspaceList}
+            />
+          </div>
+
+          {transactions.length === 0 ? (
+            <div className="card-surface flex flex-col items-center gap-4 rounded-[1.75rem] py-16 text-center">
+              <p className="text-white/60">No transactions yet. Add one to get started.</p>
+            </div>
+          ) : (
+            <div className="card-surface overflow-hidden rounded-[1.75rem]">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-white/8">
+                    <th className="px-6 py-4 text-left font-medium text-white/40">Description</th>
+                    <th className="hidden px-4 py-4 text-left font-medium text-white/40 md:table-cell">Date</th>
+                    <th className="px-4 py-4 text-left font-medium text-white/40">Type</th>
+                    <th className="px-6 py-4 text-right font-medium text-white/40">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((tx, i) => (
+                    <tr
+                      className={`transition hover:bg-white/4 ${i < transactions.length - 1 ? "border-b border-white/5" : ""}`}
+                      key={tx.id}
+                    >
+                      <td className="px-6 py-4">
+                        <p className="font-medium text-white">{tx.title}</p>
+                        {tx.merchant && <p className="text-xs text-white/40">{tx.merchant}</p>}
+                      </td>
+                      <td className="hidden px-4 py-4 text-white/60 md:table-cell">
+                        {new Date(tx.transactionDate).toLocaleDateString("en-US", {
+                          month: "short", day: "numeric", year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-4 py-4">
+                        <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${typeBadgeClass(tx.transactionType as TransactionType)}`}>
+                          {typeLabel(tx.transactionType as TransactionType)}
+                        </span>
+                      </td>
+                      <td className={`px-6 py-4 text-right font-semibold tabular-nums ${tx.transactionType === "INCOME" ? "text-emerald-400" : "text-white"}`}>
+                        {tx.transactionType === "INCOME" ? "+" : "-"}{formatCurrency(Number(tx.amount))}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
       </div>
     </main>
   );
