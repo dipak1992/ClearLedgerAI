@@ -1,6 +1,9 @@
 import { AuthActions } from "@/components/auth/auth-actions";
+import { env } from "@/lib/env";
 
 export default function SignInPage() {
+  const emailEnabled = Boolean(env.EMAIL_SERVER && env.EMAIL_FROM);
+
   return (
     <main className="flex min-h-screen items-center justify-center px-5 py-10 sm:px-8">
       <div className="card-surface w-full max-w-md rounded-[2rem] p-7">
@@ -11,7 +14,7 @@ export default function SignInPage() {
         </p>
 
         <div className="mt-8">
-          <AuthActions />
+          <AuthActions emailEnabled={emailEnabled} />
         </div>
       </div>
     </main>
