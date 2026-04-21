@@ -1,13 +1,15 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { formatCurrency } from "@/lib/utils";
-import { AppNav } from "@/components/layout/app-nav";
+import { AppShell } from "@/components/shell";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
+
+export const dynamic = "force-dynamic";
 
 type TransactionType = "EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT";
 
@@ -24,15 +26,18 @@ function typeLabel(type: TransactionType) {
   return type.charAt(0) + type.slice(1).toLowerCase();
 }
 
-export default async function WorkspaceLedgerPage({ params }: { params: Promise<{ workspaceId: string }> }) {
+export default async function WorkspaceLedgerPage({
+  params
+}: {
+  params: Promise<{ workspaceId: string }>;
+}) {
   const { workspaceId } = await params;
   const user = await getRequestUser();
   if (!user) redirect("/sign-in");
 
-  // Verify membership
   const membership = await prisma.workspaceMember.findUnique({
     where: { workspaceId_userId: { workspaceId, userId: user.id } },
-    include: { workspace: true },
+    include: { workspace: true }
   });
   if (!membership) notFound();
 
@@ -41,13 +46,14 @@ export default async function WorkspaceLedgerPage({ params }: { params: Promise<
   const now = new Date();
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
-  const transactions = await prisma.transaction.findMany({
-    where: { workspaceId },
-    orderBy: { transactionDate: "desc" },
-    take: 50,
-  });
-
-  const memberCount = await prisma.workspaceMember.count({ where: { workspaceId } });
+  const [transactions, memberCount] = await Promise.all([
+    prisma.transaction.findMany({
+      where: { workspaceId },
+      orderBy: { transactionDate: "desc" },
+      take: 50
+    }),
+    prisma.workspaceMember.count({ where: { workspaceId } })
+  ]);
 
   const monthlySpent = transactions
     .filter((t) => t.transactionType === "EXPENSE" && t.transactionDate >= monthStart)
@@ -60,20 +66,8 @@ export default async function WorkspaceLedgerPage({ params }: { params: Promise<
   const workspaceList = [{ id: workspace.id, name: workspace.name }];
 
   return (
-    <main className="min-h-screen px-5 py-8 sm:px-8 lg:px-10">
-      <div className="mx-auto max-w-7xl">
-
-        {/* Top bar */}
-        <header className="mb-8 flex items-center justify-between gap-4">
-          <Link
-            className="text-xl font-bold tracking-tight text-[var(--brand-500)]"
-            href="/dashboard"
-          >
-            ClearLedger
-          </Link>
-          <AppNav />
-          <SignOutButton />
-        </header>
+    <AppShell topBarRight={<SignOutButton />}>
+      <div className="mx-auto w-full max-w-7xl">
 
         {/* Back + title */}
         <div className="mb-8">
@@ -82,46 +76,57 @@ export default async function WorkspaceLedgerPage({ params }: { params: Promise<
             href="/dashboard"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Dashboard
+            Dashboard
           </Link>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight">{workspace.name}</h1>
-          {workspace.description && (
-            <p className="mt-1.5 text-[var(--muted)]">{workspace.description}</p>
-          )}
+          <div className="mt-3 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{workspace.name}</h1>
+              {workspace.description && (
+                <p className="mt-1.5 text-sm text-white/50">{workspace.description}</p>
+              )}
+            </div>
+            <Link
+              href={`/workspaces/${workspaceId}/shared`}
+              className="flex items-center gap-1.5 rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/5 hover:text-white transition"
+            >
+              <Users className="h-3.5 w-3.5" />
+              Members ({memberCount})
+            </Link>
+          </div>
         </div>
 
         {/* Stats */}
         <section className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <article className="card-surface rounded-[1.75rem] p-6">
             <p className="text-sm text-white/50">Monthly spent</p>
-            <p className="mt-3 text-3xl font-semibold text-white">
-              {formatCurrency(monthlySpent)}
-            </p>
-            <p className="mt-1.5 text-xs text-[var(--muted)]">
+            <p className="mt-3 text-3xl font-semibold text-white">{formatCurrency(monthlySpent)}</p>
+            <p className="mt-1.5 text-xs text-white/40">
               {now.toLocaleString("default", { month: "long" })} expenses
             </p>
           </article>
 
           <article className="card-surface rounded-[1.75rem] p-6">
             <p className="text-sm text-white/50">Monthly income</p>
-            <p className="mt-3 text-3xl font-semibold text-emerald-400">
-              {formatCurrency(monthlyIncome)}
-            </p>
-            <p className="mt-1.5 text-xs text-[var(--muted)]">
+            <p className="mt-3 text-3xl font-semibold text-emerald-400">{formatCurrency(monthlyIncome)}</p>
+            <p className="mt-1.5 text-xs text-white/40">
               {now.toLocaleString("default", { month: "long" })} income
             </p>
           </article>
 
           <article className="card-surface rounded-[1.75rem] p-6">
-            <p className="text-sm text-white/50">Total transactions</p>
+            <p className="text-sm text-white/50">Transactions</p>
             <p className="mt-3 text-3xl font-semibold text-white">{transactions.length}</p>
-            <p className="mt-1.5 text-xs text-[var(--muted)]">Last 50 shown</p>
+            <p className="mt-1.5 text-xs text-white/40">Last 50 shown</p>
           </article>
 
           <article className="card-surface rounded-[1.75rem] p-6">
             <p className="text-sm text-white/50">Members</p>
             <p className="mt-3 text-3xl font-semibold text-white">{memberCount}</p>
-            <p className="mt-1.5 text-xs text-[var(--muted)]">Workspace collaborators</p>
+            <p className="mt-1.5 text-xs text-white/40">
+              <Link href={`/workspaces/${workspaceId}/shared`} className="text-[var(--brand-500)] hover:underline">
+                Manage →
+              </Link>
+            </p>
           </article>
         </section>
 
@@ -129,10 +134,7 @@ export default async function WorkspaceLedgerPage({ params }: { params: Promise<
         <section>
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Transactions</h2>
-            <AddTransactionDialog
-              defaultWorkspaceId={workspaceId}
-              workspaces={workspaceList}
-            />
+            <AddTransactionDialog defaultWorkspaceId={workspaceId} workspaces={workspaceList} />
           </div>
 
           {transactions.length === 0 ? (
@@ -157,12 +159,14 @@ export default async function WorkspaceLedgerPage({ params }: { params: Promise<
                       key={tx.id}
                     >
                       <td className="px-6 py-4">
-                        <p className="font-medium text-white">{tx.title}</p>
-                        {tx.merchant && <p className="text-xs text-white/40">{tx.merchant}</p>}
+                        <Link href={`/transactions/${tx.moneyRecordId ?? tx.id}`} className="hover:text-[var(--brand-500)] transition-colors">
+                          <p className="font-medium text-white">{tx.title}</p>
+                          {tx.merchant && <p className="text-xs text-white/40">{tx.merchant}</p>}
+                        </Link>
                       </td>
                       <td className="hidden px-4 py-4 text-white/60 md:table-cell">
                         {new Date(tx.transactionDate).toLocaleDateString("en-US", {
-                          month: "short", day: "numeric", year: "numeric",
+                          month: "short", day: "numeric", year: "numeric"
                         })}
                       </td>
                       <td className="px-4 py-4">
@@ -182,6 +186,6 @@ export default async function WorkspaceLedgerPage({ params }: { params: Promise<
         </section>
 
       </div>
-    </main>
+    </AppShell>
   );
 }

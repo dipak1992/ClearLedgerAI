@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
+import { MoneyRecordStatus } from "@prisma/client";
 
 import { computeStatus } from "@/app/api/debts/route";
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { addDebtPaymentSchema } from "@/lib/validators/debt";
+import { debtStatusToRecordStatus } from "@/lib/money-records";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,6 +65,41 @@ export async function POST(request: Request, { params }: { params: Promise<{ deb
       status: computeStatus(Number(debt.amountTotal), nextPaidAmount, debt.dueDate)
     }
   });
+
+  // Dual-write: mirror the payment into MoneyRecordPayment if the debt
+  // has been linked to a MoneyRecord. Best-effort; legacy path is
+  // unaffected on failure.
+  if (debt.moneyRecordId) {
+    try {
+      await prisma.$transaction([
+        prisma.moneyRecordPayment.create({
+          data: {
+            recordId: debt.moneyRecordId,
+            createdById: user.id,
+            amount: parsed.data.amount,
+            paymentDate: parsed.data.paymentDate ?? new Date(),
+            method: parsed.data.method,
+            notes: parsed.data.notes
+          }
+        }),
+        prisma.moneyRecord.update({
+          where: { id: debt.moneyRecordId },
+          data: {
+            amountPaid: nextPaidAmount,
+            status:
+              nextPaidAmount >= Number(debt.amountTotal)
+                ? MoneyRecordStatus.PAID
+                : debtStatusToRecordStatus(updated.status)
+          }
+        })
+      ]);
+    } catch (err) {
+      console.error("[money-records] Failed to mirror debt payment", {
+        debtId,
+        error: err
+      });
+    }
+  }
 
   return NextResponse.json({
     data: {

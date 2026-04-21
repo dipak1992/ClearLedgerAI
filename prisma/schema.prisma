@@ -66,6 +66,25 @@ enum NotificationType {
   COMMENT
 }
 
+enum MoneyRecordType {
+  EXPENSE
+  INCOME
+  DEBT_GIVEN
+  DEBT_BORROWED
+  SPLIT_EXPENSE
+  TRANSFER
+  REIMBURSEMENT
+}
+
+enum MoneyRecordStatus {
+  PENDING
+  CLEARED
+  PAID
+  PARTIAL
+  OVERDUE
+  VOID
+}
+
 model User {
   id                String              @id @default(cuid())
   authUserId        String?             @unique
@@ -89,6 +108,8 @@ model User {
   subscriptions     Subscription[]
   accounts          Account[]
   sessions          Session[]
+  moneyRecords      MoneyRecord[]       @relation("MoneyRecordCreator")
+  moneyRecordPayments MoneyRecordPayment[]
 }
 
 model Account {
@@ -142,6 +163,7 @@ model Workspace {
   auditLogs         AuditLog[]
   notifications     Notification[]
   subscriptions     Subscription[]
+  moneyRecords      MoneyRecord[]
 }
 
 model WorkspaceMember {
@@ -167,6 +189,7 @@ model Category {
   createdAt         DateTime            @default(now())
   workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   transactions      Transaction[]
+  moneyRecords      MoneyRecord[]
 
   @@unique([workspaceId, name])
 }
@@ -188,11 +211,13 @@ model Transaction {
   aiSource          String?
   splitConfig       Json?
   metadata          Json?
+  moneyRecordId     String?             @unique
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy         User                @relation(fields: [createdById], references: [id], onDelete: Cascade)
   category          Category?           @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  moneyRecord       MoneyRecord?        @relation("TransactionMoneyRecord", fields: [moneyRecordId], references: [id], onDelete: SetNull)
   attachments       TransactionAttachment[]
   comments          Comment[]
 }
@@ -226,10 +251,12 @@ model Debt {
   method            String?
   notes             String?
   metadata          Json?
+  moneyRecordId     String?             @unique
   createdAt         DateTime            @default(now())
   updatedAt         DateTime            @updatedAt
   workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   createdBy         User                @relation("DebtCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  moneyRecord       MoneyRecord?        @relation("DebtMoneyRecord", fields: [moneyRecordId], references: [id], onDelete: SetNull)
   payments          DebtPayment[]
   timelineNotes     DebtNote[]
   attachments       DebtAttachment[]
@@ -326,4 +353,88 @@ model Notification {
   createdAt         DateTime            @default(now())
   workspace         Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+// ==============================================================
+// Unified Money Records engine (Phase 1).
+//
+// Every entry in the product is a MoneyRecord. Legacy Transaction
+// and Debt tables continue to exist and are dual-written during
+// the migration period. Once Phase 9 completes they can be retired.
+// ==============================================================
+model MoneyRecord {
+  id                  String                 @id @default(cuid())
+  workspaceId         String
+  createdById         String
+  categoryId          String?
+  type                MoneyRecordType
+  status              MoneyRecordStatus      @default(PENDING)
+  title               String?
+  amount              Decimal                @db.Decimal(12, 2)
+  amountPaid          Decimal                @default(0) @db.Decimal(12, 2)
+  currency            String                 @default("USD")
+  occurredAt          DateTime
+  dueDate             DateTime?
+  counterpartyName    String?
+  counterpartyUserId  String?
+  merchant            String?
+  paymentMethod       String?
+  notes               String?
+  aiSource            String?
+  metadata            Json?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+  workspace           Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy           User                   @relation("MoneyRecordCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  category            Category?              @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  attachments         MoneyRecordAttachment[]
+  splits              MoneyRecordSplit[]
+  payments            MoneyRecordPayment[]
+  transaction         Transaction?           @relation("TransactionMoneyRecord")
+  debt                Debt?                  @relation("DebtMoneyRecord")
+
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, type])
+  @@index([workspaceId, status])
+}
+
+model MoneyRecordAttachment {
+  id              String          @id @default(cuid())
+  recordId        String
+  kind            AttachmentKind  @default(RECEIPT)
+  fileName        String
+  storagePath     String
+  mimeType        String?
+  sizeBytes       Int?
+  createdAt       DateTime        @default(now())
+  record          MoneyRecord     @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
+}
+
+model MoneyRecordSplit {
+  id                  String          @id @default(cuid())
+  recordId            String
+  participantEmail    String?
+  participantUserId   String?
+  share               Decimal         @db.Decimal(12, 2)
+  settledAt           DateTime?
+  createdAt           DateTime        @default(now())
+  record              MoneyRecord     @relation(fields: [recordId], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
+}
+
+model MoneyRecordPayment {
+  id              String          @id @default(cuid())
+  recordId        String
+  createdById     String
+  amount          Decimal         @db.Decimal(12, 2)
+  paymentDate     DateTime        @default(now())
+  method          String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  record          MoneyRecord     @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  createdBy       User            @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([recordId])
 }

@@ -1,12 +1,33 @@
-import { DebtStatus } from "@prisma/client";
+import { DebtStatus, MoneyRecordStatus, MoneyRecordType } from "@prisma/client";
 import { NextResponse } from "next/server";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { createDebtSchema } from "@/lib/validators/debt";
+import { balanceRemaining, createRecordFromDebt } from "@/lib/money-records";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+// Phase 9: reads now use MoneyRecord as the canonical source. The POST
+// handler still dual-writes to the legacy Debt table so older clients
+// and the legacy UI remain unaffected.
+const DEPRECATION_HEADERS = {
+  Deprecation: "true",
+  Sunset: "2026-09-01",
+  Link: '</api/records>; rel="successor-version"'
+};
+
+const DEBT_TYPES: MoneyRecordType[] = [
+  MoneyRecordType.DEBT_GIVEN,
+  MoneyRecordType.DEBT_BORROWED
+];
+
+const OPEN_STATUSES: MoneyRecordStatus[] = [
+  MoneyRecordStatus.PENDING,
+  MoneyRecordStatus.PARTIAL,
+  MoneyRecordStatus.OVERDUE
+];
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -33,33 +54,55 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "You do not have access to this workspace" }, { status: 403 });
   }
 
-  const debts = await prisma.debt.findMany({
-    where: { workspaceId },
+  // Phase 9: read from MoneyRecord, project to legacy Debt shape.
+  const records = await prisma.moneyRecord.findMany({
+    where: {
+      workspaceId,
+      type: { in: DEBT_TYPES }
+    },
     include: {
       payments: {
-        orderBy: {
-          paymentDate: "desc"
-        }
+        orderBy: { paymentDate: "desc" }
       }
     },
-    orderBy: {
-      dueDate: "asc"
-    },
+    orderBy: [
+      { status: "asc" },
+      { dueDate: "asc" }
+    ],
     take: 100
   });
 
-  return NextResponse.json({
-    data: debts.map((debt) => ({
-      ...debt,
-      amountTotal: Number(debt.amountTotal),
-      amountPaid: Number(debt.amountPaid),
-      balanceRemaining: Number(debt.balanceRemaining),
-      payments: debt.payments.map((payment) => ({
-        ...payment,
-        amount: Number(payment.amount)
-      }))
+  const data = records.map((r) => ({
+    id: r.id,
+    workspaceId: r.workspaceId,
+    createdById: r.createdById,
+    counterpartyName: r.counterpartyName ?? "",
+    amountTotal: Number(r.amount),
+    amountPaid: Number(r.amountPaid),
+    balanceRemaining: balanceRemaining(r.amount, r.amountPaid),
+    currency: r.currency,
+    type: r.type === MoneyRecordType.DEBT_GIVEN ? "LENT" : "BORROWED",
+    status: recordStatusToDebtStatus(r.status),
+    purpose: r.title ?? r.notes ?? null,
+    dueDate: r.dueDate,
+    method: r.paymentMethod,
+    notes: r.notes,
+    moneyRecordId: r.id,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+    payments: r.payments.map((p) => ({
+      id: p.id,
+      recordId: p.recordId,
+      debtId: p.recordId,
+      amount: Number(p.amount),
+      paymentDate: p.paymentDate,
+      method: p.method,
+      notes: p.notes,
+      createdAt: p.createdAt
     }))
-  });
+  }));
+
+  return NextResponse.json({ data }, { headers: DEPRECATION_HEADERS });
 }
 
 export async function POST(request: Request) {
@@ -107,6 +150,21 @@ export async function POST(request: Request) {
     }
   });
 
+  // Dual-write to the unified MoneyRecord table. Best-effort: failures
+  // are logged but do not block the legacy success response.
+  try {
+    const record = await createRecordFromDebt(debt);
+    await prisma.debt.update({
+      where: { id: debt.id },
+      data: { moneyRecordId: record.id }
+    });
+  } catch (err) {
+    console.error("[money-records] Failed to mirror debt", {
+      debtId: debt.id,
+      error: err
+    });
+  }
+
   return NextResponse.json(
     {
       data: {
@@ -116,24 +174,24 @@ export async function POST(request: Request) {
         balanceRemaining: Number(debt.balanceRemaining)
       }
     },
-    { status: 201 }
+    { status: 201, headers: DEPRECATION_HEADERS }
   );
 }
 
+function recordStatusToDebtStatus(status: MoneyRecordStatus): string {
+  switch (status) {
+    case MoneyRecordStatus.PAID: return "PAID";
+    case MoneyRecordStatus.PARTIAL: return "PARTIAL";
+    case MoneyRecordStatus.OVERDUE: return "OVERDUE";
+    default: return "OPEN";
+  }
+}
+
 function computeStatus(total: number, paid: number, dueDate: Date | null) {
-  if (paid >= total) {
-    return DebtStatus.PAID;
-  }
-
-  if (paid > 0) {
-    return DebtStatus.PARTIAL;
-  }
-
-  if (dueDate && dueDate.getTime() < Date.now()) {
-    return DebtStatus.OVERDUE;
-  }
-
+  if (paid >= total) return DebtStatus.PAID;
+  if (paid > 0) return DebtStatus.PARTIAL;
+  if (dueDate && dueDate.getTime() < Date.now()) return DebtStatus.OVERDUE;
   return DebtStatus.OPEN;
 }
 
-export { computeStatus };
+export { computeStatus, OPEN_STATUSES };
