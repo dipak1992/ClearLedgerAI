@@ -71,7 +71,15 @@ export default async function DashboardPage() {
           where: { workspaceId: { in: workspaceIds } },
           orderBy: { transactionDate: "desc" },
           take: 10,
-          include: { workspace: { select: { name: true } } }
+          select: {
+            id: true,
+            title: true,
+            merchant: true,
+            amount: true,
+            transactionType: true,
+            transactionDate: true,
+            workspace: { select: { name: true } }
+          }
         })
       : Promise.resolve([]),
     workspaceIds.length

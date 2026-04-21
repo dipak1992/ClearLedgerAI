@@ -50,7 +50,15 @@ export default async function WorkspaceLedgerPage({
     prisma.transaction.findMany({
       where: { workspaceId },
       orderBy: { transactionDate: "desc" },
-      take: 50
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        merchant: true,
+        amount: true,
+        transactionType: true,
+        transactionDate: true,
+      },
     }),
     prisma.workspaceMember.count({ where: { workspaceId } })
   ]);

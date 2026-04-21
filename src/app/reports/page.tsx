@@ -41,6 +41,14 @@ export default async function ReportsPage() {
           transactionDate: { gte: sixMonthsAgo },
         },
         orderBy: { transactionDate: "asc" },
+        select: {
+          id: true,
+          title: true,
+          merchant: true,
+          amount: true,
+          transactionType: true,
+          transactionDate: true,
+        },
       })
     : [];
 
