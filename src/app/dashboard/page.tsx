@@ -5,12 +5,16 @@ import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp } fr
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { formatCurrency } from "@/lib/utils";
+import { flags } from "@/lib/flags";
 import { CreateWorkspaceDialog } from "@/components/dashboard/create-workspace-dialog";
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
 import { AddDebtDialog } from "@/components/dashboard/add-debt-dialog";
 import { AiImportWidget } from "@/components/dashboard/ai-import-widget";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { AppNav } from "@/components/layout/app-nav";
+import { AppShell } from "@/components/shell";
+
+import { DashboardV2 } from "./dashboard-v2";
 
 type TransactionType = "EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT";
 
@@ -48,6 +52,18 @@ export default async function DashboardPage() {
 
   const workspaces = memberships.map((m) => m.workspace);
   const workspaceIds = workspaces.map((w) => w.id);
+
+  // Phase 3: action-first dashboard wrapped in the mobile-first shell.
+  // Opt-in via NEXT_PUBLIC_FLAG_MONEY_RECORDS; falls back to the
+  // original layout when the flag is off so behavior is identical for
+  // existing users until we flip it.
+  if (flags.moneyRecords || flags.mobileNav) {
+    return (
+      <AppShell topBarRight={<SignOutButton />}>
+        <DashboardV2 user={{ id: user.id, name: user.name ?? null }} workspaces={workspaces} />
+      </AppShell>
+    );
+  }
 
   const [recentTransactions, openDebts] = await Promise.all([
     workspaceIds.length

@@ -30,4 +30,5 @@ pnpm-debug.log*
 
 # prisma
 /prisma/dev.db
-/prisma/dev.db-journaltsconfig.tsbuildinfo
+/prisma/dev.db-journal
+tsconfig.tsbuildinfo
