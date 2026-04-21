@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { createTransactionSchema } from "@/lib/validators/transaction";
+import { createRecordFromTransaction } from "@/lib/money-records";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,22 @@ export async function POST(request: Request) {
       notes: payload.notes
     }
   });
+
+  // Dual-write: mirror into the unified MoneyRecord table. Non-blocking
+  // for the user: if mirroring fails we log but still return the
+  // created transaction so the legacy path cannot regress.
+  try {
+    const record = await createRecordFromTransaction(transaction);
+    await prisma.transaction.update({
+      where: { id: transaction.id },
+      data: { moneyRecordId: record.id }
+    });
+  } catch (err) {
+    console.error("[money-records] Failed to mirror transaction", {
+      transactionId: transaction.id,
+      error: err
+    });
+  }
 
   return NextResponse.json(
     {

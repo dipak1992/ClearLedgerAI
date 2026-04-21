@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { createDebtSchema } from "@/lib/validators/debt";
+import { createRecordFromDebt } from "@/lib/money-records";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -106,6 +107,21 @@ export async function POST(request: Request) {
       notes: payload.notes
     }
   });
+
+  // Dual-write to the unified MoneyRecord table. Best-effort: failures
+  // are logged but do not block the legacy success response.
+  try {
+    const record = await createRecordFromDebt(debt);
+    await prisma.debt.update({
+      where: { id: debt.id },
+      data: { moneyRecordId: record.id }
+    });
+  } catch (err) {
+    console.error("[money-records] Failed to mirror debt", {
+      debtId: debt.id,
+      error: err
+    });
+  }
 
   return NextResponse.json(
     {
