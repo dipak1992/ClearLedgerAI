@@ -60,7 +60,7 @@ export async function POST(request: Request) {
       userId: d.createdById,
       type: NotificationType.REMINDER,
       title: `Due soon: ${d.counterpartyName}`,
-      body: `${d.currency} ${Number(d.balanceRemaining).toFixed(2)} due ${d.dueDate!.toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`
+      body: `${d.currency} ${Number(d.balanceRemaining).toFixed(2)} due ${(d.dueDate ?? new Date()).toLocaleDateString("en-US", { month: "short", day: "numeric" })}.`
     }))
   ];
 

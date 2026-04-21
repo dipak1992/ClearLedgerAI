@@ -243,6 +243,16 @@ export async function getBalances(workspaceIds: string[], now: Date = new Date()
 }
 
 /**
+ * Remaining balance on a debt/record: amount − amountPaid, floor at 0.
+ */
+export function balanceRemaining(
+  amount: Prisma.Decimal | number | string,
+  amountPaid: Prisma.Decimal | number | string
+): number {
+  return Math.max(Number(amount) - Number(amountPaid), 0);
+}
+
+/**
  * Convenience wrappers around the legacy→unified mappers for dual-write
  * callers in the Transaction and Debt API routes.
  */

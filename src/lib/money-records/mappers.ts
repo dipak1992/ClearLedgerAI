@@ -88,10 +88,7 @@ export function transactionToRecordData(tx: TransactionToRecordInput) {
     createdById: tx.createdById,
     categoryId: tx.categoryId ?? null,
     type: transactionTypeToRecordType(tx.transactionType),
-    status:
-      tx.transactionType === TransactionType.TRANSFER
-        ? MoneyRecordStatus.CLEARED
-        : MoneyRecordStatus.CLEARED,
+    status: MoneyRecordStatus.CLEARED,
     title: tx.title,
     amount: tx.amount,
     currency: tx.currency,
