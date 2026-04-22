@@ -29,6 +29,7 @@ interface ParsedPreview {
   paymentMethod: string;
   currency: string;
   type: "TRANSACTION" | "DEBT";
+  transactionType: "EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT";
   debtType: string;
   counterpartyName: string;
   notes: string;
@@ -49,6 +50,12 @@ function toEditablePreview(data: Record<string, unknown>): ParsedPreview {
     paymentMethod: String(data.paymentMethod ?? ""),
     currency: String(data.currency ?? "USD"),
     type: data.type === "DEBT" ? "DEBT" : "TRANSACTION",
+    transactionType:
+      data.transactionType === "INCOME" ||
+      data.transactionType === "TRANSFER" ||
+      data.transactionType === "REIMBURSEMENT"
+        ? data.transactionType
+        : "EXPENSE",
     debtType: String(data.debtType ?? "LENT"),
     counterpartyName: String(data.counterpartyName ?? ""),
     notes: String(data.notes ?? ""),
@@ -209,19 +216,29 @@ export function AiImportWidget({ workspaces, defaultWorkspaceId }: Props) {
 
   async function handleSave() {
     if (!preview) return;
+    if (!preview.title.trim()) {
+      setError("Add a title before saving.");
+      return;
+    }
+    if (!(Number(preview.amount) > 0)) {
+      setError("AI import needs a valid amount before it can be saved.");
+      return;
+    }
+
     setSaving(true);
     setError(null);
 
     try {
       const editedData = {
-        title: preview.title || "Imported transaction",
-        amount: Number(preview.amount) || 0,
+        title: preview.title.trim(),
+        amount: Number(preview.amount),
         merchant: preview.merchant || undefined,
         category: preview.category || undefined,
         paymentMethod: preview.paymentMethod || undefined,
         currency: preview.currency || "USD",
         transactionDate: preview.transactionDate || undefined,
         type: preview.type,
+        transactionType: preview.type === "TRANSACTION" ? preview.transactionType : undefined,
         debtType: preview.type === "DEBT" ? (preview.debtType || "LENT") : undefined,
         counterpartyName: preview.type === "DEBT" ? (preview.counterpartyName || "Unknown") : undefined,
         notes: preview.notes || undefined,
@@ -562,6 +579,28 @@ export function AiImportWidget({ workspaces, defaultWorkspaceId }: Props) {
                   />
                 </div>
 
+                {preview.type === "TRANSACTION" && (
+                  <div>
+                    <label className="mb-1.5 block text-xs font-medium text-white/50">Transaction type</label>
+                    <div className="flex flex-wrap gap-2">
+                      {(["EXPENSE", "INCOME", "TRANSFER", "REIMBURSEMENT"] as const).map((type) => (
+                        <button
+                          key={type}
+                          className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                            preview.transactionType === type
+                              ? "bg-[var(--brand-600)] text-white"
+                              : "bg-white/8 text-white/60 hover:bg-white/12 hover:text-white"
+                          }`}
+                          onClick={() => setPreview((p) => p && { ...p, transactionType: type })}
+                          type="button"
+                        >
+                          {type}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Type toggle */}
                 <div>
                   <label className="mb-1.5 block text-xs font-medium text-white/50">Type</label>
@@ -631,7 +670,7 @@ export function AiImportWidget({ workspaces, defaultWorkspaceId }: Props) {
                 </Button>
                 <Button
                   className="flex-1 gap-2"
-                  disabled={saving || !preview.amount || Number(preview.amount) <= 0}
+                  disabled={saving || !preview.title.trim() || !preview.amount || Number(preview.amount) <= 0}
                   onClick={() => { void handleSave(); }}
                 >
                   {saving ? (

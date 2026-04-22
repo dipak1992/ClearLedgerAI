@@ -36,6 +36,7 @@ const openAiImportSchema = {
     currency: { type: "string" },
     transactionDate: { type: "string" },
     type: { type: "string", enum: ["TRANSACTION", "DEBT"] },
+    transactionType: { type: "string", enum: ["EXPENSE", "INCOME", "TRANSFER", "REIMBURSEMENT"] },
     debtType: {
       type: "string",
       enum: ["LENT", "BORROWED", "CUSTOMER_UNPAID", "ADVANCE_PAYMENT", "REIMBURSEMENT_PENDING"]
@@ -81,22 +82,38 @@ export async function POST(request: Request) {
   // If the client sent pre-edited data, skip AI entirely
   let parsedResult = editedData ?? null;
   let parserUsed: "user-edited" | "openai-vision" | "openai-text" | "heuristic" = "heuristic";
+  let parserError: string | null = null;
 
   if (!parsedResult) {
     if (imageData) {
       const attempt = await parseImageWithOpenAI({ imageData, mode });
       parsedResult = attempt.data;
       parserUsed = "openai-vision";
+      parserError = attempt.error;
     } else {
       const prompt = getModePrompt(mode);
       const attempt = await parseWithOpenAI({ input: input!, prompt, mode });
       parsedResult = attempt.data;
       parserUsed = "openai-text";
+      parserError = attempt.error;
     }
 
     if (!parsedResult) {
-      parsedResult = heuristicParseImport(input ?? "Imported transaction");
-      parserUsed = "heuristic";
+      if (!imageData) {
+        parsedResult = heuristicParseImport(input ?? "");
+        if (parsedResult) {
+          parserUsed = "heuristic";
+        }
+      }
+    }
+
+    if (!parsedResult) {
+      return NextResponse.json(
+        {
+          error: parserError ?? "We couldn't extract a trustworthy record from that input. Try a clearer image or add more details."
+        },
+        { status: 422 }
+      );
     }
   } else {
     parserUsed = "user-edited";
@@ -140,7 +157,7 @@ export async function POST(request: Request) {
           amount: parsedResult.amount,
           currency: (parsedResult.currency ?? "USD").toUpperCase(),
           merchant: parsedResult.merchant,
-          transactionType: TransactionType.EXPENSE,
+          transactionType: toTransactionType(parsedResult.transactionType),
           paymentMethod: parsedResult.paymentMethod,
           transactionDate,
           notes: parsedResult.notes,
@@ -157,6 +174,7 @@ export async function POST(request: Request) {
     saved,
     metadata: {
       parser: parserUsed,
+      parserError,
       persisted: persist
     }
   });
@@ -213,8 +231,9 @@ async function parseImageWithOpenAI({
               content: [
                 "You are a financial data extraction engine for ClearLedger AI.",
                 "Return only structured JSON. No markdown, no explanation.",
+                "Never invent fields that are not visible in the image.",
                 `Import mode: ${mode}`,
-                aiPrompts.imageParser
+                `Task prompt: ${getModePrompt(mode)} ${aiPrompts.imageParser}`
               ].join(" ")
             },
             {
@@ -324,6 +343,7 @@ async function parseWithOpenAI({
                 "You are an extraction engine for ClearLedger AI.",
                 "Return only structured JSON, no markdown.",
                 "Use the schema exactly.",
+                "Never invent missing values.",
                 `Import mode: ${mode}`,
                 `Task prompt: ${prompt}`
               ].join(" ")
@@ -419,6 +439,19 @@ function toDebtType(type?: string) {
   }
 
   return DebtType.LENT;
+}
+
+function toTransactionType(type?: string) {
+  if (
+    type === TransactionType.EXPENSE ||
+    type === TransactionType.INCOME ||
+    type === TransactionType.TRANSFER ||
+    type === TransactionType.REIMBURSEMENT
+  ) {
+    return type;
+  }
+
+  return TransactionType.EXPENSE;
 }
 
 async function backoff(attempt: number) {

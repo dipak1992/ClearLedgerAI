@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp, Edit2 } from "lucide-react";
+import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp } from "lucide-react";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
@@ -11,7 +11,6 @@ import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dia
 import { AddDebtDialog } from "@/components/dashboard/add-debt-dialog";
 import { AiImportWidget } from "@/components/dashboard/ai-import-widget";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
-import { ManageWorkspaceDialog } from "@/components/dashboard/manage-workspace-dialog";
 import { AppNav } from "@/components/layout/app-nav";
 import { AppShell } from "@/components/shell";
 
@@ -434,23 +433,6 @@ export default async function DashboardPage() {
                       {ws._count.transactions} transaction{ws._count.transactions !== 1 ? "s" : ""}
                     </p>
                   </Link>
-                  <div className="mt-4 flex justify-end">
-                    <ManageWorkspaceDialog
-                      redirectTo="/dashboard"
-                      triggerClassName="w-full sm:w-auto"
-                      triggerContent={
-                        <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white/8 px-4 text-sm font-medium text-white/70 ring-1 ring-white/10 transition hover:bg-white/12 hover:text-white">
-                          <Edit2 className="h-4 w-4" />
-                          Edit Workspace
-                        </span>
-                      }
-                      workspace={{
-                        id: ws.id,
-                        name: ws.name,
-                        description: ws.description
-                      }}
-                    />
-                  </div>
                 </div>
               ))}
             </div>
