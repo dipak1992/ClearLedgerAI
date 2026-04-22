@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp } from "lucide-react";
+import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp, Edit2, Trash2, MoreVertical } from "lucide-react";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
@@ -126,6 +126,57 @@ export default async function DashboardPage() {
   const defaultWorkspaceId = workspaces[0]?.id;
   const firstName = user.name?.split(" ")[0] ?? "there";
 
+  // First-time user with no workspaces
+  if (workspaces.length === 0) {
+    return (
+      <main className="min-h-screen px-5 py-8 sm:px-8 lg:px-10">
+        <div className="mx-auto max-w-7xl">
+          <header className="mb-8 flex items-center justify-between gap-4">
+            <Link
+              className="text-xl font-bold tracking-tight text-[var(--brand-500)]"
+              href="/dashboard"
+            >
+              ClearLedger
+            </Link>
+            <AppNav />
+            <SignOutButton />
+          </header>
+
+          <section className="mb-12">
+            <h1 className="text-4xl font-semibold tracking-tight">Welcome to ClearLedger, {firstName}!</h1>
+            <p className="mt-3 max-w-lg text-lg text-[var(--muted)]">
+              Let's get you started. Create a workspace to organize and track your money.
+            </p>
+          </section>
+
+          <div className="grid gap-6 sm:grid-cols-2">
+            <article className="card-surface rounded-[1.75rem] p-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--brand-500)]/15 text-[var(--brand-500)] mb-4">
+                <FolderOpen className="h-6 w-6" />
+              </div>
+              <h2 className="text-xl font-semibold">Create a Workspace</h2>
+              <p className="mt-2 text-[var(--muted)]">Set up your first workspace for personal, business, or shared tracking.</p>
+              <div className="mt-6">
+                <CreateWorkspaceDialog />
+              </div>
+            </article>
+
+            <article className="card-surface rounded-[1.75rem] p-8">
+              <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--accent)]/15 text-[var(--accent)] mb-4">
+                <Wallet className="h-6 w-6" />
+              </div>
+              <h2 className="text-xl font-semibold">Add Your First Record</h2>
+              <p className="mt-2 text-[var(--muted)]">Once you create a workspace, add transactions, debts, and expenses to get organized.</p>
+              <div className="mt-6">
+                <AiImportWidget defaultWorkspaceId={defaultWorkspaceId} workspaces={workspaceList} />
+              </div>
+            </article>
+          </div>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen px-5 py-8 sm:px-8 lg:px-10">
       <div className="mx-auto max-w-7xl">
@@ -176,12 +227,6 @@ export default async function DashboardPage() {
             defaultType="INCOME"
             defaultWorkspaceId={defaultWorkspaceId}
             triggerLabel="+ Income"
-            workspaces={workspaceList}
-          />
-          <AddTransactionDialog
-            defaultType="TRANSFER"
-            defaultWorkspaceId={defaultWorkspaceId}
-            triggerLabel="+ Transfer"
             workspaces={workspaceList}
           />
           <AddDebtDialog
@@ -293,10 +338,6 @@ export default async function DashboardPage() {
         <section className="mt-8">
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-lg font-semibold">Recent Transactions</h2>
-            <AddTransactionDialog
-              defaultWorkspaceId={defaultWorkspaceId}
-              workspaces={workspaceList}
-            />
           </div>
 
           {recentTransactions.length === 0 ? (
@@ -317,6 +358,7 @@ export default async function DashboardPage() {
                     <th className="hidden px-4 py-4 text-left font-medium text-white/40 md:table-cell">Date</th>
                     <th className="px-4 py-4 text-left font-medium text-white/40">Type</th>
                     <th className="px-6 py-4 text-right font-medium text-white/40">Amount</th>
+                    <th className="px-4 py-4 text-right font-medium text-white/40">Action</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -326,8 +368,10 @@ export default async function DashboardPage() {
                       key={tx.id}
                     >
                       <td className="px-6 py-4">
-                        <p className="font-medium text-white">{tx.title}</p>
-                        {tx.merchant && <p className="text-xs text-white/40">{tx.merchant}</p>}
+                        <Link href={`/transactions/${tx.id}`} className="hover:text-[var(--brand-500)] transition">
+                          <p className="font-medium text-white">{tx.title}</p>
+                          {tx.merchant && <p className="text-xs text-white/40">{tx.merchant}</p>}
+                        </Link>
                       </td>
                       <td className="hidden px-4 py-4 text-white/60 sm:table-cell">
                         {tx.workspace.name}
@@ -344,6 +388,11 @@ export default async function DashboardPage() {
                       </td>
                       <td className={`px-6 py-4 text-right font-semibold tabular-nums ${tx.transactionType === "INCOME" ? "text-emerald-400" : "text-white"}`}>
                         {tx.transactionType === "INCOME" ? "+" : "-"}{formatCurrency(Number(tx.amount))}
+                      </td>
+                      <td className="px-4 py-4 text-right">
+                        <Link href={`/transactions/${tx.id}`} className="text-[var(--brand-500)] hover:text-[var(--brand-400)] text-xs font-medium">
+                          Edit →
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -368,21 +417,32 @@ export default async function DashboardPage() {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {workspaces.map((ws) => (
-                <Link
-                  className="card-surface group flex flex-col gap-2 rounded-[1.75rem] p-6 transition hover:border-[var(--brand-500)]/40"
-                  href={`/workspaces/${ws.id}`}
+                <div
+                  className="card-surface group relative flex flex-col gap-2 rounded-[1.75rem] p-6 transition hover:border-[var(--brand-500)]/40"
                   key={ws.id}
                 >
-                  <p className="font-semibold transition-colors group-hover:text-[var(--brand-500)]">
-                    {ws.name}
-                  </p>
-                  {ws.description && (
-                    <p className="line-clamp-2 text-sm text-[var(--muted)]">{ws.description}</p>
-                  )}
-                  <p className="mt-auto pt-3 text-xs text-white/40">
-                    {ws._count.transactions} transaction{ws._count.transactions !== 1 ? "s" : ""}
-                  </p>
-                </Link>
+                  <Link
+                    className="hover:text-[var(--brand-500)]"
+                    href={`/workspaces/${ws.id}`}
+                  >
+                    <p className="font-semibold transition-colors">{ws.name}</p>
+                    {ws.description && (
+                      <p className="line-clamp-2 text-sm text-[var(--muted)]">{ws.description}</p>
+                    )}
+                    <p className="mt-auto pt-3 text-xs text-white/40">
+                      {ws._count.transactions} transaction{ws._count.transactions !== 1 ? "s" : ""}
+                    </p>
+                  </Link>
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition">
+                    <Link
+                      href={`/workspaces/${ws.id}`}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-[var(--brand-600)] text-white/60 hover:text-white transition text-xs"
+                      title="Edit workspace"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Link>
+                  </div>
+                </div>
               ))}
             </div>
           )}

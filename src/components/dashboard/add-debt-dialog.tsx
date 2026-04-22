@@ -99,14 +99,17 @@ export function AddDebtDialog({
 
   if (workspaces.length === 0) {
     return (
-      <button
-        className={triggerClassName ?? defaultTriggerClass}
-        disabled
-        title="Create a workspace first"
-        type="button"
-      >
-        {triggerLabel}
-      </button>
+      <div>
+        <button
+          className={triggerClassName ?? defaultTriggerClass + " opacity-50 cursor-not-allowed"}
+          disabled
+          title="Create a workspace first to add debts"
+          type="button"
+        >
+          {triggerLabel}
+        </button>
+        <p className="mt-1 text-xs text-[var(--brand-500)]/60">Create a workspace first</p>
+      </div>
     );
   }
 

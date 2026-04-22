@@ -90,13 +90,16 @@ export function AddTransactionDialog({ workspaces, defaultWorkspaceId, defaultTy
 
   if (workspaces.length === 0) {
     return (
-      <button
-        className="inline-flex items-center gap-2 rounded-full bg-white/8 px-4 py-2.5 text-sm text-[var(--muted)] ring-1 ring-white/10"
-        disabled
-        title="Create a workspace first"
-      >
-        + Add Transaction
-      </button>
+      <div>
+        <button
+          className="inline-flex items-center gap-2 rounded-full bg-white/5 px-4 py-2.5 text-sm text-[var(--muted)] cursor-not-allowed ring-1 ring-white/10"
+          disabled
+          title="Create a workspace first to add transactions"
+        >
+          + Add Transaction
+        </button>
+        <p className="mt-1 text-xs text-white/50">Create a workspace first</p>
+      </div>
     );
   }
 

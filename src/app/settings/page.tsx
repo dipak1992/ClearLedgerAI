@@ -12,11 +12,17 @@ export default async function SettingsPage() {
   const user = await getRequestUser();
   if (!user) redirect("/sign-in");
 
-  const memberships = await prisma.workspaceMember.findMany({
-    where: { userId: user.id },
-    include: { workspace: { select: { id: true, name: true, currency: true } } },
-    orderBy: { joinedAt: "asc" }
-  });
+  let memberships: Array<{ workspaceId: string; role: string; joinedAt: Date | null; workspace: { id: string; name: string; currency: string } }> = [];
+  try {
+    memberships = await prisma.workspaceMember.findMany({
+      where: { userId: user.id },
+      include: { workspace: { select: { id: true, name: true, currency: true } } },
+      orderBy: { joinedAt: "asc" }
+    });
+  } catch (error) {
+    console.error("Error fetching workspaces:", error);
+    // Continue anyway - settings page should still work
+  }
 
   const initial = (user.name ?? user.email ?? "?")[0].toUpperCase();
 
