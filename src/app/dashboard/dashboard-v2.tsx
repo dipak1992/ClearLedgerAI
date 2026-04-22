@@ -18,6 +18,7 @@ import { CreateWorkspaceDialog } from "@/components/dashboard/create-workspace-d
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
 import { AddDebtDialog } from "@/components/dashboard/add-debt-dialog";
 import { AiImportWidget } from "@/components/dashboard/ai-import-widget";
+import { WorkspaceExportTrigger } from "@/components/dashboard/workspace-export-trigger";
 
 interface WorkspaceSummary {
   id: string;
@@ -169,6 +170,13 @@ export async function DashboardV2({ user, workspaces }: DashboardV2Props) {
         />
         <AiImportWidget defaultWorkspaceId={defaultWorkspaceId} workspaces={workspaceList} />
         <AddDebtDialog defaultWorkspaceId={defaultWorkspaceId} workspaces={workspaceList} />
+        {defaultWorkspaceId ? (
+          <WorkspaceExportTrigger
+            showQuickExport={false}
+            triggerLabel="Export Workspace"
+            workspace={{ id: defaultWorkspaceId, name: workspaces[0]?.name ?? "Workspace" }}
+          />
+        ) : null}
         <CreateWorkspaceDialog />
       </section>
 

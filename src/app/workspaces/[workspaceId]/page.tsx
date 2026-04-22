@@ -9,6 +9,8 @@ import { AppShell } from "@/components/shell";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
 import { ManageWorkspaceDialog } from "@/components/dashboard/manage-workspace-dialog";
+import { WorkspaceExportTrigger } from "@/components/dashboard/workspace-export-trigger";
+import { WorkspaceMobileActionsMenu } from "@/components/dashboard/workspace-mobile-actions-menu";
 
 export const dynamic = "force-dynamic";
 
@@ -94,7 +96,12 @@ export default async function WorkspaceLedgerPage({
                 <p className="mt-1.5 text-sm text-white/50">{workspace.description}</p>
               )}
             </div>
-            <div className="flex flex-col gap-2 sm:flex-row">
+            <WorkspaceMobileActionsMenu
+              memberCount={memberCount}
+              workspace={{ id: workspace.id, name: workspace.name, description: workspace.description }}
+            />
+            <div className="hidden flex-col gap-2 sm:flex-row md:flex">
+              <WorkspaceExportTrigger workspace={{ id: workspace.id, name: workspace.name }} />
               <ManageWorkspaceDialog
                 redirectTo="/dashboard"
                 triggerClassName="w-full sm:w-auto"

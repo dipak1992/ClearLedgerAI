@@ -7,6 +7,7 @@ import { prisma } from "@/lib/server/prisma";
 import { formatCurrency } from "@/lib/utils";
 import { AppShell, Card, StatTile } from "@/components/shell";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { WorkspaceExportTrigger } from "@/components/dashboard/workspace-export-trigger";
 
 export const dynamic = "force-dynamic";
 
@@ -23,7 +24,7 @@ export default async function InsightsPage() {
 
   const memberships = await prisma.workspaceMember.findMany({
     where: { userId: user.id },
-    select: { workspaceId: true }
+    select: { workspaceId: true, workspace: { select: { name: true } } }
   });
   const workspaceIds = memberships.map((m) => m.workspaceId);
 
@@ -373,17 +374,21 @@ export default async function InsightsPage() {
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-base font-semibold">Export Data</h2>
-              <p className="mt-0.5 text-xs text-white/40">Download your transaction history as CSV.</p>
+              <p className="mt-0.5 text-xs text-white/40">Download polished workspace reports in PDF, Excel, CSV, Word, or Google Sheets.</p>
             </div>
             <div className="flex flex-wrap gap-2">
               {memberships.slice(0, 3).map((m) => (
-                <a
+                <WorkspaceExportTrigger
                   key={m.workspaceId}
-                  href={`/api/workspaces/${m.workspaceId}/export?format=csv`}
-                  className="rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/70 hover:bg-white/5 transition"
-                >
-                  Export CSV
-                </a>
+                  showQuickExport={false}
+                  triggerClassName="w-full sm:w-auto"
+                  triggerContent={
+                    <span className="inline-flex min-h-11 items-center justify-center rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/70 transition hover:bg-white/5">
+                      Export {m.workspace.name}
+                    </span>
+                  }
+                  workspace={{ id: m.workspaceId, name: m.workspace.name }}
+                />
               ))}
             </div>
           </div>
@@ -393,4 +398,3 @@ export default async function InsightsPage() {
     </AppShell>
   );
 }
-

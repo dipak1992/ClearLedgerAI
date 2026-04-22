@@ -1,19 +1,33 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
 
 import { getRequestUser } from "@/lib/server/auth";
-import { prisma } from "@/lib/server/prisma";
+import {
+  buildWorkspaceExportData,
+  defaultExportOptions,
+  generateWorkspaceExport,
+  normalizeExportOptions,
+  type WorkspaceExportOptions,
+  type WorkspaceExportFormat,
+  WorkspaceExportAccessError
+} from "@/lib/exports/workspace-export";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-function escapeCSV(value: unknown): string {
-  if (value === null || value === undefined) return "";
-  const s = String(value);
-  if (s.includes(",") || s.includes('"') || s.includes("\n")) {
-    return `"${s.replace(/"/g, '""')}"`;
-  }
-  return s;
-}
+const exportRequestSchema = z.object({
+  format: z.enum(["pdf", "excel", "csv", "word", "google_sheets"]).default("csv"),
+  dateRange: z.enum(["all", "this_month", "last_month", "custom"]).default("all"),
+  customStart: z.string().optional(),
+  customEnd: z.string().optional(),
+  includeSummary: z.boolean().default(true),
+  includeTransactions: z.boolean().default(true),
+  includeDebts: z.boolean().default(true),
+  includeNotes: z.boolean().default(true),
+  includeMembers: z.boolean().default(true),
+  includeCharts: z.boolean().default(true),
+  csvVariant: z.enum(["combined", "transactions", "debts"]).default("combined")
+});
 
 export async function GET(
   request: Request,
@@ -21,72 +35,90 @@ export async function GET(
 ) {
   const { workspaceId } = await params;
   const { searchParams } = new URL(request.url);
-  const format = searchParams.get("format") ?? "csv";
+  const format = (searchParams.get("format") ?? "csv") as WorkspaceExportFormat;
 
+  const payload = {
+    ...defaultExportOptions(format),
+    format,
+    dateRange: (searchParams.get("dateRange") ?? "all") as WorkspaceExportOptions["dateRange"],
+    customStart: searchParams.get("customStart") ?? undefined,
+    customEnd: searchParams.get("customEnd") ?? undefined,
+    csvVariant: (searchParams.get("csvVariant") ?? "combined") as WorkspaceExportOptions["csvVariant"],
+    includeSummary: parseBoolean(searchParams.get("includeSummary"), true),
+    includeTransactions: parseBoolean(searchParams.get("includeTransactions"), true),
+    includeDebts: parseBoolean(searchParams.get("includeDebts"), true),
+    includeNotes: parseBoolean(searchParams.get("includeNotes"), true),
+    includeMembers: parseBoolean(searchParams.get("includeMembers"), true),
+    includeCharts: parseBoolean(searchParams.get("includeCharts"), format === "pdf")
+  };
+
+  return handleExportRequest(workspaceId, payload);
+}
+
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ workspaceId: string }> }
+) {
+  const { workspaceId } = await params;
+  const body = await request.json();
+  const parsed = exportRequestSchema.safeParse(body);
+
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  return handleExportRequest(workspaceId, parsed.data);
+}
+
+async function handleExportRequest(workspaceId: string, rawOptions: Partial<WorkspaceExportOptions>) {
   const user = await getRequestUser();
-  if (!user) return NextResponse.json({ error: "Authentication required" }, { status: 401 });
-
-  const membership = await prisma.workspaceMember.findFirst({
-    where: { workspaceId, userId: user.id }
-  });
-  if (!membership) {
-    return NextResponse.json({ error: "You do not have access to this workspace" }, { status: 403 });
+  if (!user) {
+    return NextResponse.json({ error: "Authentication required" }, { status: 401 });
   }
 
-  const workspace = await prisma.workspace.findUnique({
-    where: { id: workspaceId },
-    select: { name: true }
-  });
+  try {
+    const options = normalizeExportOptions(rawOptions);
+    const { data } = await buildWorkspaceExportData(workspaceId, user.id, options);
+    const payload = await generateWorkspaceExport(data, options);
 
-  const transactions = await prisma.transaction.findMany({
-    where: { workspaceId },
-    orderBy: { transactionDate: "desc" },
-    include: { category: { select: { name: true } } }
-  });
-
-  if (format === "json") {
-    return NextResponse.json({
-      workspace: workspace?.name,
-      exportedAt: new Date().toISOString(),
-      count: transactions.length,
-      data: transactions.map((tx) => ({
-        id: tx.id,
-        title: tx.title,
-        amount: Number(tx.amount),
-        currency: tx.currency,
-        type: tx.transactionType,
-        merchant: tx.merchant,
-        category: tx.category?.name ?? null,
-        paymentMethod: tx.paymentMethod,
-        date: tx.transactionDate.toISOString().slice(0, 10),
-        notes: tx.notes
-      }))
-    });
-  }
-
-  // CSV
-  const headers = ["id", "date", "title", "type", "amount", "currency", "merchant", "category", "paymentMethod", "notes"];
-  const rows = transactions.map((tx) => [
-    tx.id,
-    tx.transactionDate.toISOString().slice(0, 10),
-    tx.title,
-    tx.transactionType,
-    Number(tx.amount).toFixed(2),
-    tx.currency,
-    tx.merchant ?? "",
-    tx.category?.name ?? "",
-    tx.paymentMethod ?? "",
-    tx.notes ?? ""
-  ]);
-
-  const csv = [headers.map(escapeCSV).join(","), ...rows.map((r) => r.map(escapeCSV).join(","))].join("\n");
-
-  const fileName = `clearledger-${(workspace?.name ?? workspaceId).replace(/\s+/g, "-").toLowerCase()}-${new Date().toISOString().slice(0, 10)}.csv`;
-
-  return new Response(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${fileName}"`
+    if (options.format === "google_sheets") {
+      return NextResponse.json({
+        openUrl: payload.openUrl,
+        suggestedFileName: payload.suggestedFileName,
+        csvContent: payload.csvContent
+      });
     }
-  });
+
+    if (payload.text !== undefined) {
+      return new Response(payload.text, {
+        headers: {
+          "Content-Type": payload.contentType,
+          "Content-Disposition": `attachment; filename="${payload.fileName}"`
+        }
+      });
+    }
+
+    return new Response(payload.buffer ? new Uint8Array(payload.buffer) : null, {
+      headers: {
+        "Content-Type": payload.contentType,
+        "Content-Disposition": `attachment; filename="${payload.fileName}"`
+      }
+    });
+  } catch (error) {
+    if (error instanceof WorkspaceExportAccessError) {
+      return NextResponse.json({ error: error.message }, { status: error.status });
+    }
+
+    console.error("[workspace-export] Failed to export workspace", {
+      workspaceId,
+      error
+    });
+
+    return NextResponse.json({ error: "Export failed. Please try again." }, { status: 500 });
+  }
+}
+
+function parseBoolean(value: string | null, fallback: boolean) {
+  if (value === null) return fallback;
+  return value === "1" || value === "true" || value === "yes" || value === "on";
 }

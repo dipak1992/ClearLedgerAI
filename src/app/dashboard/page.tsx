@@ -11,6 +11,7 @@ import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dia
 import { AddDebtDialog } from "@/components/dashboard/add-debt-dialog";
 import { AiImportWidget } from "@/components/dashboard/ai-import-widget";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { WorkspaceExportTrigger } from "@/components/dashboard/workspace-export-trigger";
 import { AppNav } from "@/components/layout/app-nav";
 import { AppShell } from "@/components/shell";
 
@@ -433,6 +434,18 @@ export default async function DashboardPage() {
                       {ws._count.transactions} transaction{ws._count.transactions !== 1 ? "s" : ""}
                     </p>
                   </Link>
+                  <div className="mt-4">
+                    <WorkspaceExportTrigger
+                      showQuickExport={false}
+                      triggerClassName="w-full"
+                      triggerContent={
+                        <span className="inline-flex min-h-11 w-full items-center justify-center rounded-full bg-white/8 px-4 text-sm font-medium text-white/75 ring-1 ring-white/10 transition hover:bg-white/12 hover:text-white">
+                          Export Workspace
+                        </span>
+                      }
+                      workspace={{ id: ws.id, name: ws.name }}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
