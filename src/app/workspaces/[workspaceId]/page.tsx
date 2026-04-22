@@ -1,6 +1,6 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Users } from "lucide-react";
+import { ArrowLeft, Pencil, Users } from "lucide-react";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
@@ -8,6 +8,7 @@ import { formatCurrency } from "@/lib/utils";
 import { AppShell } from "@/components/shell";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
 import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
+import { ManageWorkspaceDialog } from "@/components/dashboard/manage-workspace-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -93,13 +94,30 @@ export default async function WorkspaceLedgerPage({
                 <p className="mt-1.5 text-sm text-white/50">{workspace.description}</p>
               )}
             </div>
-            <Link
-              href={`/workspaces/${workspaceId}/shared`}
-              className="flex items-center gap-1.5 rounded-xl border border-white/10 px-4 py-2 text-xs font-medium text-white/60 hover:bg-white/5 hover:text-white transition"
-            >
-              <Users className="h-3.5 w-3.5" />
-              Members ({memberCount})
-            </Link>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <ManageWorkspaceDialog
+                redirectTo="/dashboard"
+                triggerClassName="w-full sm:w-auto"
+                triggerContent={
+                  <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white/70 transition hover:bg-white/5 hover:text-white">
+                    <Pencil className="h-4 w-4" />
+                    Edit Workspace
+                  </span>
+                }
+                workspace={{
+                  id: workspace.id,
+                  name: workspace.name,
+                  description: workspace.description
+                }}
+              />
+              <Link
+                href={`/workspaces/${workspaceId}/shared`}
+                className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/10 px-4 py-2 text-sm font-medium text-white/60 transition hover:bg-white/5 hover:text-white"
+              >
+                <Users className="h-4 w-4" />
+                Members ({memberCount})
+              </Link>
+            </div>
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { AppShell, Card } from "@/components/shell";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { ManageWorkspaceDialog } from "@/components/dashboard/manage-workspace-dialog";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +13,11 @@ export default async function SettingsPage() {
   const user = await getRequestUser();
   if (!user) redirect("/sign-in");
 
-  let memberships: Array<{ workspaceId: string; role: string; joinedAt: Date | null; workspace: { id: string; name: string; currency: string } }> = [];
+  let memberships: Array<{ workspaceId: string; role: string; joinedAt: Date | null; workspace: { id: string; name: string; currency: string; description: string | null } }> = [];
   try {
     memberships = await prisma.workspaceMember.findMany({
       where: { userId: user.id },
-      include: { workspace: { select: { id: true, name: true, currency: true } } },
+      include: { workspace: { select: { id: true, name: true, currency: true, description: true } } },
       orderBy: { joinedAt: "asc" }
     });
   } catch (error) {
@@ -86,15 +87,29 @@ export default async function SettingsPage() {
                     <p className="mt-0.5 text-xs text-white/40">{m.workspace.currency} · {m.role}</p>
                   </div>
                   <div className="flex items-center gap-2">
+                    <ManageWorkspaceDialog
+                      redirectTo="/settings"
+                      triggerClassName="w-full sm:w-auto"
+                      triggerContent={
+                        <span className="inline-flex min-h-10 items-center justify-center rounded-full bg-white/5 px-4 text-xs font-medium text-white/70 transition hover:bg-white/10 hover:text-white">
+                          Manage
+                        </span>
+                      }
+                      workspace={{
+                        id: m.workspace.id,
+                        name: m.workspace.name,
+                        description: m.workspace.description
+                      }}
+                    />
                     <Link
                       href={`/workspaces/${m.workspaceId}/shared`}
-                      className="shrink-0 rounded-full bg-white/5 px-4 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white"
+                      className="inline-flex min-h-10 shrink-0 items-center rounded-full bg-white/5 px-4 py-1.5 text-xs font-medium text-white/60 transition hover:bg-white/10 hover:text-white"
                     >
                       Members
                     </Link>
                     <Link
                       href={`/workspaces/${m.workspaceId}`}
-                      className="shrink-0 rounded-full bg-white/8 px-4 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/14 hover:text-white"
+                      className="inline-flex min-h-10 shrink-0 items-center rounded-full bg-white/8 px-4 py-1.5 text-xs font-medium text-white/70 transition hover:bg-white/14 hover:text-white"
                     >
                       Open →
                     </Link>

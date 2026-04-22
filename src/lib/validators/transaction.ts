@@ -13,3 +13,7 @@ export const createTransactionSchema = z.object({
   notes: z.string().max(1000).optional(),
   categoryId: z.string().cuid().optional()
 });
+
+export const updateTransactionSchema = createTransactionSchema.omit({
+  workspaceId: true
+});

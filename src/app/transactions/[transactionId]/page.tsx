@@ -1,12 +1,14 @@
 import { redirect, notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
 import { formatCurrency } from "@/lib/utils";
 import { AppShell, Card } from "@/components/shell";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dialog";
+import { DeleteTransactionButton } from "@/components/dashboard/delete-transaction-button";
 
 export const dynamic = "force-dynamic";
 
@@ -123,6 +125,7 @@ export default async function TransactionDetailPage({
   const badgeClass = TYPE_COLOR[record.type] ?? "bg-white/10 text-white/60";
   const sign = TYPE_SIGN[record.type] ?? "";
   const typeLabel = record.type.charAt(0) + record.type.slice(1).toLowerCase();
+  const workspaceList = [{ id: record.workspaceId, name: record.workspaceName }];
 
   return (
     <AppShell topBarRight={<SignOutButton />}>
@@ -145,6 +148,41 @@ export default async function TransactionDetailPage({
           <p className={`mt-2 text-5xl font-bold tabular-nums ${amountColor}`}>
             {sign}{formatCurrency(record.amount)}
           </p>
+        </div>
+
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row">
+          <AddTransactionDialog
+            defaultWorkspaceId={record.workspaceId}
+            mode="edit"
+            transaction={{
+              id: record.id,
+              title: record.title ?? "",
+              amount: record.amount,
+              transactionType: record.type as "EXPENSE" | "INCOME" | "TRANSFER" | "REIMBURSEMENT",
+              transactionDate: record.occurredAt,
+              merchant: record.merchant,
+              notes: record.notes
+            }}
+            triggerClassName="w-full sm:w-auto"
+            triggerContent={
+              <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-white/8 px-5 text-sm font-medium text-white ring-1 ring-white/10 transition hover:bg-white/12 sm:w-auto">
+                <Pencil className="h-4 w-4" />
+                Edit Transaction
+              </span>
+            }
+            workspaces={workspaceList}
+          />
+          <DeleteTransactionButton
+            redirectTo={`/workspaces/${record.workspaceId}`}
+            transactionId={record.id}
+            triggerClassName="w-full sm:w-auto"
+            triggerContent={
+              <span className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-red-500/12 px-5 text-sm font-medium text-red-300 ring-1 ring-red-400/20 transition hover:bg-red-500/18 sm:w-auto">
+                <Trash2 className="h-4 w-4" />
+                Delete Transaction
+              </span>
+            }
+          />
         </div>
 
         {/* Detail card */}

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp, Edit2, Trash2, MoreVertical } from "lucide-react";
+import { ArrowUpRight, Clock3, Wallet, FolderOpen, TrendingDown, TrendingUp, Edit2 } from "lucide-react";
 
 import { getRequestUser } from "@/lib/server/auth";
 import { prisma } from "@/lib/server/prisma";
@@ -11,6 +11,7 @@ import { AddTransactionDialog } from "@/components/dashboard/add-transaction-dia
 import { AddDebtDialog } from "@/components/dashboard/add-debt-dialog";
 import { AiImportWidget } from "@/components/dashboard/ai-import-widget";
 import { SignOutButton } from "@/components/dashboard/sign-out-button";
+import { ManageWorkspaceDialog } from "@/components/dashboard/manage-workspace-dialog";
 import { AppNav } from "@/components/layout/app-nav";
 import { AppShell } from "@/components/shell";
 
@@ -145,7 +146,7 @@ export default async function DashboardPage() {
           <section className="mb-12">
             <h1 className="text-4xl font-semibold tracking-tight">Welcome to ClearLedger, {firstName}!</h1>
             <p className="mt-3 max-w-lg text-lg text-[var(--muted)]">
-              Let's get you started. Create a workspace to organize and track your money.
+              Let&apos;s get you started. Create a workspace to organize and track your money.
             </p>
           </section>
 
@@ -433,14 +434,22 @@ export default async function DashboardPage() {
                       {ws._count.transactions} transaction{ws._count.transactions !== 1 ? "s" : ""}
                     </p>
                   </Link>
-                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition">
-                    <Link
-                      href={`/workspaces/${ws.id}`}
-                      className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 hover:bg-[var(--brand-600)] text-white/60 hover:text-white transition text-xs"
-                      title="Edit workspace"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Link>
+                  <div className="mt-4 flex justify-end">
+                    <ManageWorkspaceDialog
+                      redirectTo="/dashboard"
+                      triggerClassName="w-full sm:w-auto"
+                      triggerContent={
+                        <span className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-white/8 px-4 text-sm font-medium text-white/70 ring-1 ring-white/10 transition hover:bg-white/12 hover:text-white">
+                          <Edit2 className="h-4 w-4" />
+                          Edit Workspace
+                        </span>
+                      }
+                      workspace={{
+                        id: ws.id,
+                        name: ws.name,
+                        description: ws.description
+                      }}
+                    />
                   </div>
                 </div>
               ))}
